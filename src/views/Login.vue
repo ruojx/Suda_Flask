@@ -2,7 +2,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-// import { loginApi } from '@/api/public'
+import { loginApi } from '@/api/public'
 
 const router = useRouter()
 // 登录表单数据
@@ -28,7 +28,10 @@ const login = async () => {
     if (result.code === 1) {
       // 保存用户信息到本地存储
       localStorage.setItem('loginUser', JSON.stringify(result.data))
-
+      // 通知同页的 Layout 立刻刷新认证态
+      window.dispatchEvent(new Event('auth:changed'))
+      // 跳转
+      router.replace('/home')
       // 记录用户登录日志（直接调用后端接口）
       try {
         // 这里可以调用后端接口记录登录日志
@@ -54,7 +57,7 @@ const login = async () => {
 const back = () => {
   loginForm.username = ''
   loginForm.password = ''
-  router.back()
+  router.push(`/home`)
 }
 
 // 忘记密码
@@ -88,272 +91,94 @@ const reset = () => {
 </template>
 
 
-<!-- <style scoped>
-/* 引入FontAwesome */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
-
+<style scoped>
+/* 整体容器：竖向居中 */
 #container {
+  min-height: 50vh;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
-  padding: 90px 20px 20px 20px;
-  width: 100%;
-}
-
-.enter_select_card {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  margin-top: 60px;
+  padding: 24px 12px;
 }
 
-.welcome-text {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.welcome-title {
-  font-size: 32px;
-  font-weight: 500;
-  color: #333;
-  margin: 0 0 12px 0;
-  letter-spacing: 0.05em;
-}
-
-.welcome-subtitle {
-  font-size: 24px;
-  font-weight: 400;
-  color: rgba(0, 0, 0, 0.85);
-  margin: 0;
-  letter-spacing: 0.02em;
-}
-
-.cards-container {
-  display: flex;
-  gap: 32px;
-  justify-content: center;
-  align-items: center;
-}
-
-.card {
-  width: 240px;
-  background: #fff;
-  border-radius: 22px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-  padding: 32px 18px 28px 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  transition: transform 0.22s, box-shadow 0.22s;
-  position: relative;
-  overflow: hidden;
-}
-
-.card:hover {
-  transform: translateY(-8px) scale(1.05);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.25);
-}
-
-.card-student {
-  background: #f0f0f0;
-}
-
-.card-design {
-  background: #f0f0f0;
-}
-
-.card-admin {
-  background: #f0f0f0;
-}
-
-.icon {
-  width: 56px;
-  height: 56px;
-  margin-bottom: 18px;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-.icon i {
-  font-size: 28px;
-  color: #333;
-}
-
-.card-title {
-  font-size: 22px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.card-subtitle {
-  font-size: 15px;
-  color: rgba(0, 0, 0, 0.7);
-  margin-bottom: 18px;
-}
-
-.card-btn {
-  width: 100%;
-  border-radius: 16px;
-  font-size: 1.1em;
-  transition: all 0.18s;
-  border: none;
-  color: #333;
-  font-weight: 600;
-}
-
-.card-btn-student {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.card-btn-student:hover {
-  background: rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px);
-}
-
-.card-btn-teacher {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.card-btn-teacher:hover {
-  background: rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px);
-}
-
-.card-btn-admin {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.card-btn-admin:hover {
-  background: rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px);
-}
-
+/* 登录卡片：竖向偏长 */
 .login-form {
-  width: 370px;
+  width: 360px; /* 固定宽度，避免横向铺开 */
+  min-height: 300px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #fff;
-  padding: 36px 32px 28px 32px;
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
-  position: relative;
-  margin-top: 90px;
+  padding: 32px 28px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 内容垂直居中，无底部留白 */
 }
 
-.page-transition {
-  animation: page-fade-in 0.7s cubic-bezier(.4, 0, .2, 1);
-}
-
-@keyframes page-fade-in {
-  0% {
-    opacity: 0;
-    transform: translateY(40px) scale(0.98);
-  }
-
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes card-fade-in {
-  0% {
-    opacity: 0;
-    transform: translateY(40px) scale(0.98);
-  }
-
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
-
+/* 标题 */
 .title {
-  font-size: 26px;
+  margin: 0 0 24px;
+  font-size: 20px;
   font-weight: 700;
   text-align: center;
-  margin-bottom: 24px;
-  color: #333;
-  letter-spacing: 0.04em;
+  color: #111;
 }
 
+/* 表单项 */
 .el-form-item {
   margin-bottom: 18px;
 }
+:deep(.el-form-item__label) {
+  color: #444;
+}
 
+/* 输入框：选中时边框高亮 */
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #d1d5db inset;
+}
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #9ca3af inset;
+}
+:deep(.is-focus .el-input__wrapper) {
+  box-shadow: 0 0 0 2px #1e80ff inset;
+}
+
+/* 按钮组：横排等宽 */
 .button-group {
   display: flex;
   gap: 12px;
-  justify-content: space-between;
-  margin-top: 24px;
+  margin-top: 12px;
 }
-
 .login-button {
-  flex: 1;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  border: none;
+  flex: 1; /* 两个按钮等宽 */
+  height: 40px;
+  border-radius: 8px;
+  font-size: 15px;
 }
-
-.back-btn {
-  background: rgb(254, 254, 254);
-  color: #666;
-}
-
-.back-btn:hover {
-  background: rgb(228, 228, 228);
-  transform: translateY(-1px);
-}
-
-.forgot-btn {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.forgot-btn:hover {
-  background: #e0e0e0;
-  transform: translateY(-1px);
-}
-
 .login-btn {
-  background: #f0f0f0;
-  color: #333;
+  background: #1e80ff;
+  border-color: #1e80ff;
 }
-
 .login-btn:hover {
-  background: #e0e0e0;
-  transform: translateY(-1px);
+  background: #0b5ed7;
+  border-color: #0b5ed7;
+}
+.back-btn {
+  background: #f5f7fa;
+  color: #111;
+  border-color: #e5e7eb;
+}
+.back-btn:hover {
+  background: #e5e7eb;
 }
 
+/* 注册提示 */
 .register-link {
   text-align: center;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
+  margin-top: 16px;
+  color: #6b7280;
+  font-size: 13px;
 }
+</style>
 
-.register-link span {
-  color: #666;
-  font-size: 14px;
-}
-
-.register-btn {
-  color: #333;
-  text-decoration: none;
-  font-weight: 500;
-  margin-left: 8px;
-  transition: all 0.2s;
-}
-
-.register-btn:hover {
-  color: #666;
-  text-decoration: underline;
-}
-</style> -->
