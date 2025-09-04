@@ -31,6 +31,7 @@ const router = createRouter({
   routes
 })
 
+// 路由拦截
 router.beforeEach((to, from, next) => {
   const token = JSON.parse(localStorage.getItem('loginUser') || '{}')?.token
 

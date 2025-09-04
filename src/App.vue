@@ -13,7 +13,6 @@ const route = useRoute()
         <component :is="Component" />
       </transition>
     </router-view>
-    
   </div>
 </template>
 

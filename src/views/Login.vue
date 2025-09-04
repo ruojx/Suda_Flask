@@ -54,7 +54,7 @@ const login = async () => {
 const back = () => {
   loginForm.username = ''
   loginForm.password = ''
-  router.back()``
+  router.back()
 }
 
 // 忘记密码
