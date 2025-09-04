@@ -3,14 +3,14 @@ import { ElMessage } from 'element-plus'
 
 const routes = [
   // 公共页（任何人可见）
-  { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
-  { path: '/reset', name: 'Reset', component: () => import('@/views/Reset.vue') },
-
+  
   {
     path: '/',
     component: () => import('@/views/Layout.vue'),
     redirect: '/home',
     children: [
+      { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
+      { path: '/reset', name: 'Reset', component: () => import('@/views/Reset.vue') },
       // 首页：不需要登录
       { path: 'home', name: 'Home', component: () => import('@/views/Home.vue') },
       { path: 'resource', name: 'Resource', component: () => import('@/views/Resource.vue') },

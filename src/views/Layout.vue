@@ -25,7 +25,7 @@ const avatarUrl = computed(
 )
 const unreadCount = ref(0) // 可在 mounted 时请求后端未读数
 
-function readLoginUser () {
+function readLoginUser() {
   try { return JSON.parse(localStorage.getItem('loginUser') || '{}') } catch { return {} }
 }
 
@@ -35,14 +35,17 @@ const onStorage = (e) => {
     loginUser.value = readLoginUser()
   }
 }
+const onAuthChanged = () => { loginUser.value = readLoginUser() }
 
 onMounted(() => {
   window.addEventListener('storage', onStorage)
   window.addEventListener('click', onWindowClick)
+  window.addEventListener('auth:changed', onAuthChanged)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('storage', onStorage)
   window.removeEventListener('click', onWindowClick)
+  window.removeEventListener('auth:changed', onAuthChanged)
 })
 const onWindowClick = () => (menuOpen.value = false)
 
@@ -63,7 +66,7 @@ const toggleMenu = (e) => {
 const logout = () => {
   localStorage.removeItem('loginUser')
   loginUser.value = {}
-  router.replace('/login')
+  router.replace('/home')
 }
 
 // 生成登录后的回跳参数
@@ -86,13 +89,8 @@ const loginLink = computed(() => ({
           </router-link>
 
           <nav class="top-nav" role="navigation" aria-label="主导航">
-            <router-link
-              v-for="item in navs"
-              :key="item.path"
-              :to="item.path"
-              class="nav-link"
-              active-class="nav-active"
-            >
+            <router-link v-for="item in navs" :key="item.path" :to="item.path" class="nav-link"
+              active-class="nav-active">
               {{ item.label }}
             </router-link>
           </nav>
@@ -101,12 +99,7 @@ const loginLink = computed(() => ({
         <!-- 中区：搜索 -->
         <div class="middle">
           <form class="search" @submit.prevent="onSearch">
-            <input
-              v-model.trim="keyword"
-              type="search"
-              placeholder="搜索内容、话题或用户"
-              aria-label="搜索"
-            />
+            <input v-model.trim="keyword" type="search" placeholder="搜索内容、话题或用户" aria-label="搜索" />
             <button type="submit" class="search-btn" aria-label="搜索">搜</button>
           </form>
         </div>
@@ -128,14 +121,10 @@ const loginLink = computed(() => ({
               </span>
             </button>
 
-            <div
-              class="avatar"
-              role="button"
-              aria-label="用户菜单"
-              :aria-expanded="menuOpen"
-              @click.stop="toggleMenu"
-            >
-              <img :src="avatarUrl" alt="avatar" />
+            <div class="avatar-wrap" @click.stop="toggleMenu" role="button" aria-label="用户菜单" :aria-expanded="menuOpen">
+              <div class="avatar">
+                <img :src="avatarUrl" alt="avatar" />
+              </div>
               <ul v-show="menuOpen" class="dropdown" @click.stop>
                 <li><router-link to="/user/me">我的主页</router-link></li>
                 <li><router-link to="/settings/profile">设置</router-link></li>
@@ -222,6 +211,7 @@ const loginLink = computed(() => ({
   background: var(--primary);
   display: inline-block;
 }
+
 .logo-text {
   font-weight: 700;
   color: var(--text);
@@ -232,23 +222,29 @@ const loginLink = computed(() => ({
   display: flex;
   gap: 12px;
 }
+
 .nav-link {
   padding: 6px 10px;
   border-radius: 8px;
   color: var(--muted);
   text-decoration: none;
 }
+
 .nav-link:hover {
   background: #f5f7fa;
   color: var(--text);
 }
+
 .nav-active {
   background: #eaf2ff;
   color: var(--primary);
 }
 
 /* 中间：搜索 */
-.middle { display: flex; }
+.middle {
+  display: flex;
+}
+
 .search {
   width: 100%;
   display: flex;
@@ -257,6 +253,7 @@ const loginLink = computed(() => ({
   overflow: hidden;
   background: #fafafa;
 }
+
 .search input {
   flex: 1;
   height: 36px;
@@ -266,6 +263,7 @@ const loginLink = computed(() => ({
   background: transparent;
   color: var(--text);
 }
+
 .search-btn {
   padding: 0 12px;
   border: none;
@@ -274,7 +272,10 @@ const loginLink = computed(() => ({
   color: #fff;
   cursor: pointer;
 }
-.search-btn:hover { background: var(--primary-ink); }
+
+.search-btn:hover {
+  background: var(--primary-ink);
+}
 
 /* 右侧：动作区 */
 .right {
@@ -289,8 +290,15 @@ const loginLink = computed(() => ({
   line-height: 36px;
   padding: 0 2px;
 }
-.text-link:hover { text-decoration: underline; }
-.divider-vert { color: #bbb; padding: 0 4px; }
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+.divider-vert {
+  color: #bbb;
+  padding: 0 4px;
+}
 
 .ask-btn {
   height: 36px;
@@ -301,7 +309,10 @@ const loginLink = computed(() => ({
   color: #fff;
   cursor: pointer;
 }
-.ask-btn:hover { background: var(--primary-ink); }
+
+.ask-btn:hover {
+  background: var(--primary-ink);
+}
 
 .icon-btn {
   position: relative;
@@ -312,59 +323,91 @@ const loginLink = computed(() => ({
   background: #fff;
   cursor: pointer;
 }
-.icon-btn:hover { background: #f5f7fa; }
 
-.badge{
+.icon-btn:hover {
+  background: #f5f7fa;
+}
+
+.badge {
   position: absolute;
-  top: -6px; right: -6px;
-  min-width: 18px; height: 18px;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
   padding: 0 4px;
   border-radius: 9px;
-  background: #ff4d4f; color: #fff;
-  font-size: 12px; line-height: 18px; text-align: center;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
 }
 
 /* 头像 + 下拉 */
+.avatar-wrap { position: relative; } /* 菜单定位参考这个容器 */
+
 .avatar {
-  position: relative;
   width: 36px; height: 36px;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: hidden;                  
   border: 1px solid var(--line);
-  cursor: pointer;
   background: #fff;
+  cursor: pointer;
 }
 .avatar img {
   width: 100%; height: 100%; object-fit: cover;
 }
+
 .dropdown {
-  position: absolute;
+  position: absolute; right: 0; top: calc(100% + 8px);
+  z-index: 1001;
   right: 0;
   top: calc(100% + 8px);
   width: 160px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: 0 12px 30px rgba(0,0,0,.08);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .08);
   list-style: none;
   padding: 6px 0;
 }
-.dropdown li { line-height: 36px; }
-.dropdown a, .dropdown :deep(a) {
+
+.dropdown li {
+  line-height: 36px;
+}
+
+.dropdown a,
+.dropdown :deep(a) {
   display: block;
   padding: 0 12px;
   color: var(--text);
   text-decoration: none;
 }
-.dropdown a:hover { background: #f5f7fa; }
+
+.dropdown a:hover {
+  background: #f5f7fa;
+}
+
 .dropdown .divider {
-  height: 1px; background: var(--line); margin: 6px 0;
+  height: 1px;
+  background: var(--line);
+  margin: 6px 0;
 }
 
 /* 主体区 */
-.zh-main { padding: 18px 0 42px; }
-.page-enter-active, .page-leave-active { transition: opacity .2s ease }
-.page-enter-from, .page-leave-to { opacity: 0 }
+.zh-main {
+  padding: 18px 0 42px;
+}
+
+.page-enter-active,
+.page-leave-active {
+  transition: opacity .2s ease
+}
+
+.page-enter-from,
+.page-leave-to {
+  opacity: 0
+}
 
 /* 响应式 */
 @media (max-width: 960px) {
@@ -372,7 +415,16 @@ const loginLink = computed(() => ({
     grid-template-columns: 1fr auto auto;
     gap: 10px;
   }
-  .top-nav { display: none; }  /* 小屏隐藏顶栏导航，可改抽屉 */
-  .middle { display: none; }   /* 小屏隐藏搜索，可改弹窗 */
+
+  .top-nav {
+    display: none;
+  }
+
+  /* 小屏隐藏顶栏导航，可改抽屉 */
+  .middle {
+    display: none;
+  }
+
+  /* 小屏隐藏搜索，可改弹窗 */
 }
 </style>
