@@ -94,11 +94,12 @@ const reset = () => {
 <style scoped>
 /* 整体容器：竖向居中 */
 #container {
-  min-height: 50vh;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 24px 12px;
+  background-image: url("@/assets/login_bg.jpg");
 }
 
 /* 登录卡片：竖向偏长 */
@@ -110,6 +111,7 @@ const reset = () => {
   background: #fff;
   padding: 32px 28px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  border: auto auto;
   display: flex;
   flex-direction: column;
   justify-content: center; /* 内容垂直居中，无底部留白 */
