@@ -100,7 +100,7 @@ const loginLink = computed(() => ({
         <div class="middle">
           <form class="search" @submit.prevent="onSearch">
             <input v-model.trim="keyword" type="search" placeholder="搜索内容、话题或用户" aria-label="搜索" />
-            <button type="submit" class="search-btn" aria-label="搜索">搜</button>
+            <button type="submit" class="search-btn" aria-label="搜索">&#128269;</button>
           </form>
         </div>
 
@@ -396,7 +396,7 @@ const loginLink = computed(() => ({
 
 /* 主体区 */
 .zh-main {
-  padding: 18px 0 42px;
+  padding: 18px 0 42px 0;
 }
 
 .page-enter-active,
