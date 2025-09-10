@@ -3,23 +3,17 @@ import { ElMessage } from 'element-plus'
 
 const routes = [
   // 公共页（任何人可见）
-  
+  { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
   {
     path: '/',
     component: () => import('@/views/Layout.vue'),
     redirect: '/home',
     children: [
-      { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
       { path: '/reset', name: 'Reset', component: () => import('@/views/Reset.vue') },
-      // 首页：不需要登录
       { path: 'home', name: 'Home', component: () => import('@/views/Home.vue') },
       { path: 'resource', name: 'Resource', component: () => import('@/views/Resource.vue') },
       { path: 'chat', name: 'Chat', component: () => import('@/views/Chat.vue') },
       { path: 'consultation', name: 'Consultation', component: () => import('@/views/Consultation.vue') },
-
-      // { path: 'user/:id', name: 'UserProfile', component: () => import('@/views/user/Profile.vue'), meta: { requiresAuth: true } },
-      // { path: 'editor', name: 'Editor', component: () => import('@/views/editor/Editor.vue'), meta: { requiresAuth: true } },
-      // { path: 'notifications', name: 'Notifications', component: () => import('@/views/notify/Notifications.vue'), meta: { requiresAuth: true } },
     ]
   },
 
