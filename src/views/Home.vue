@@ -35,7 +35,7 @@
         v-for="item in feed" 
         :key="`${item.type}-${item.id}`" 
         class="feed-item card"
-        :class="{'topic-item': item.type === 'topic'}"
+        :class="{'topic-item': item.type === 'topic', 'post-item': item.type === 'post'}"
       >
         <!-- 帖子/话题 -->
         <div class="item-header">
@@ -519,6 +519,10 @@ const feedData = {
 
 .feed-item.topic-item {
   border-left: 4px solid #ffa116;
+}
+
+.feed-item.post-item {
+  border-left: 4px solid #1e80ff;
 }
 
 .item-header {
