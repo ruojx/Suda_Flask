@@ -17,7 +17,7 @@
           <button class="action-btn" @click="createNewPost">发帖子</button>
           <button class="action-btn" @click="createNewTopic">发话题</button>
         </div>
-        <div class="sort-options">
+        <div v-if="currentTab!='recommend'" class="sort-options">
           <select v-model="currentSort" @change="fetchFeed">
             <option value="time">按时间排序</option>
             <option value="hot">按热度排序</option>
@@ -32,34 +32,34 @@
     <div v-else>
       <!-- 帖子列表 -->
       <article 
-        v-for="item in feed" 
-        :key="`${item.type}-${item.id}`" 
-        class="feed-item card"
-        :class="{'topic-item': item.type === 'topic', 'post-item': item.type === 'post'}"
-      >
-        <!-- 帖子/话题 -->
-        <div class="item-header">
-          <h3 class="title">{{ item.title }}</h3>
-          <span class="item-type">{{ item.type === 'post' ? '帖子' : '话题' }}</span>
-        </div>
-        <p class="summary">{{ item.summary }}</p>
-        <!-- 有关展示 -->
-        <div class="actions">
-          <span>👁️ {{ item.viewCount }}</span>
-          <span @click="toggleLike(item)">👍 {{ item.likeCount }}</span>
+  v-for="item in feed" 
+  :key="`${item.type}-${item.id}`" 
+  class="feed-item card"
+  :class="{'topic-item': item.type === 'topic', 'post-item': item.type === 'post'}"
+>
+  <!-- 帖子/话题 -->
+  <div class="item-header">
+    <h3 class="title">{{ item.title }}</h3>
+    <span class="item-type">{{ item.type === 'post' ? '帖子' : '话题' }}</span>
+  </div>
+  <p class="summary">{{ item.summary }}</p>
+  <!-- 互动展示 -->
+  <div class="actions">
+    <span>👁️ {{ item.viewCount || 0 }}</span>
+    <span @click="toggleLike(item)">👍 {{ item.likeCount || 0 }}</span>
 
-          <span v-if="item.type === 'post'">💬 {{ item.commentCount }}</span>
-          <span v-else>关注 {{ item.followCount }}</span>
+    <span v-if="item.type === 'post'">💬 {{ item.commentCount || 0 }}</span>
+    <span v-else>关注 {{ item.followCount || 0 }}</span>
 
-          <span v-if="item.type === 'post'" @click="toggleCollect(item)">⭐ {{ item.collectCount }}</span>
-          <span v-else>帖子 {{ item.postCount }}</span>
-        </div>
-        <!-- 创建者姓名和创建时间 -->
-        <div class="item-footer">
-          <span class="author">{{ item.authorName }}</span>
-          <span class="publish-time">{{ formatTime(item.createTime) }}</span>
-        </div>
-      </article>
+    <span v-if="item.type === 'post'" @click="toggleCollect(item)">⭐ {{ item.collectCount || 0 }}</span>
+    <span v-else>帖子 {{ item.postCount || 0 }}</span>
+  </div>
+  <!-- 创建者姓名和创建时间 -->
+  <div class="item-footer">
+    <span class="author">{{ item.authorName || '匿名' }}</span>
+    <span class="publish-time">{{ formatTime(item.createTime) }}</span>
+  </div>
+</article>
 
       <!-- 分页器 -->
       <div class="pagination-container">
@@ -131,7 +131,7 @@ const tabs = [
 ]
 
 const currentTab = ref('post')  // 默认显示帖子
-const currentSort = ref('hot') // 默认按热度排序
+const currentSort = ref('hot') // 默认按热度排序  hot/time
 
 // 信息流数据
 const feed = ref([])  // 信息流数据
@@ -181,20 +181,17 @@ async function fetchFeed() {
       size: pageSize.value  // 每页大小
     }
     // 先使用静态数据数据
-    const response = feedData;
-    // const response = await getFeedList(params)
+    // const response = feedData;
+    const response = await getFeedList(params)
     if (response.code === 1) {
       const data = response.data
       feed.value = data.list
+      console.log(data)
       totalPages.value = data.pages
       currentPage.value = data.pageNum
     }
   } catch (error) {
     console.error('获取内容失败:', error)
-    if (showErrorPopup.value) {
-      errorMessage.value = '获取内容失败: ' + error.message
-      showErrorModal.value = true
-    }
   } finally {
     loading.value = false
   }
@@ -417,9 +414,7 @@ const feedData = {
     isFirstPage: true,
     isLastPage: false,
     hasPreviousPage: false,
-    hasNextPage: true,
-    navigatePages: 8,
-    navigatepageNums: [1, 2]
+    hasNextPage: true
   }
 };
 
