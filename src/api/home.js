@@ -13,6 +13,15 @@ export function getFeedList(params) {
   })
 }
 
+// 获取用户关注的话题
+export function getUserFollows(userId) {
+  return request({
+    url: '/api/feed/follow',
+    method: 'get',
+    params: { userId }
+  })
+}
+
 // 创建新帖子
 export function createPost(data) {
   return request({
@@ -99,6 +108,15 @@ export function updateCollect(data) {
   })
 }
 
+// 更新关注状态 (新增函数)
+export function updateFollow(data) {
+  return request({
+    url: '/api/interaction/follow',
+    method: 'post',
+    data
+  })
+}
+
 // 发表评论
 export function addComment(data) {
   return request({
@@ -147,5 +165,5 @@ export function getUserTopics(userId) {
     url: '/api/user/topics',
     method: 'get',
     params: { userId }
-  })
+  }) 
 }
