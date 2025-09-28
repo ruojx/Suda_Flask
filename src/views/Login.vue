@@ -3,14 +3,16 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { loginApi } from '@/api/public'
+import { useUserStore } from '@/stores/userStore' // 引入 userStore
 
 const router = useRouter()
+const userStore = useUserStore() // 获取 Pinia store 实例
+
 // 登录表单数据
 const loginForm = reactive({
   username: '',
   password: ''
 })
-
 
 // 登录处理
 const login = async () => {
@@ -26,12 +28,13 @@ const login = async () => {
     })
 
     if (result.code === 1) {
-      // 保存用户信息到本地存储
-      localStorage.setItem('loginUser', JSON.stringify(result.data))
+      // 保存用户信息到 Pinia 和 localStorage
+      userStore.setUser(result.data)
       // 通知同页的 Layout 立刻刷新认证态
       window.dispatchEvent(new Event('auth:changed'))
       // 跳转
       router.replace('/home')
+
       // 记录用户登录日志（直接调用后端接口）
       try {
         // 这里可以调用后端接口记录登录日志
@@ -43,8 +46,7 @@ const login = async () => {
 
       // 跳转至对应角色页面
       router.push(`/home`)
-    }
-    else {
+    } else {
       ElMessage.error('用户或密码不正确')
     }
   } catch (error) {
@@ -65,6 +67,7 @@ const reset = () => {
   router.push(`/reset?mode=forget&role=${role.value}`)
 }
 </script>
+
 
 <template>
   <div id="container">

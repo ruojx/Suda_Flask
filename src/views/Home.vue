@@ -17,7 +17,7 @@
           <button class="action-btn" @click="createNewPost">发帖子</button>
           <button class="action-btn" @click="createNewTopic">发话题</button>
         </div>
-        <div v-if="currentTab!='recommend'" class="sort-options">
+        <div v-if="currentTab!='recommend' && currentTab!='follow'" class="sort-options">
           <select v-model="currentSort" @change="fetchFeed">
             <option value="time">按时间排序</option>
             <option value="hot">按热度排序</option>
@@ -30,36 +30,41 @@
     <div v-if="loading" class="loading">加载中...</div>
     
     <div v-else>
-      <!-- 帖子列表 -->
+      <!-- 列表 -->
       <article 
-  v-for="item in feed" 
-  :key="`${item.type}-${item.id}`" 
-  class="feed-item card"
-  :class="{'topic-item': item.type === 'topic', 'post-item': item.type === 'post'}"
->
-  <!-- 帖子/话题 -->
-  <div class="item-header">
-    <h3 class="title">{{ item.title }}</h3>
-    <span class="item-type">{{ item.type === 'post' ? '帖子' : '话题' }}</span>
-  </div>
-  <p class="summary">{{ item.summary }}</p>
-  <!-- 互动展示 -->
-  <div class="actions">
-    <span>👁️ {{ item.viewCount || 0 }}</span>
-    <span @click="toggleLike(item)">👍 {{ item.likeCount || 0 }}</span>
+        v-for="item in feed" 
+        :key="`${item.type}-${item.id}`" 
+        class="feed-item card"
+        :class="{'topic-item': item.type === 'topic', 'post-item': item.type === 'post'}"
+      >
+        <!-- 帖子/话题 -->
+        <div class="item-header">
+          <h3 class="title">{{ item.title }}</h3>
+          <span class="item-type">{{ item.type === 'post' ? '帖子' : '话题' }}</span>
+        </div>
+        <p class="summary">{{ item.summary }}</p>
+        
+        <!-- 互动展示 -->
+        <div class="actions">
+          <span>👁️ {{ item.viewCount || 0 }}</span>
+          <span @click="toggleLike(item)">👍 {{ item.likeCount || 0 }}</span>
 
-    <span v-if="item.type === 'post'">💬 {{ item.commentCount || 0 }}</span>
-    <span v-else>关注 {{ item.followCount || 0 }}</span>
+          <span v-if="item.type === 'post'" @click="toggleCollect(item)">⭐ {{ item.collectCount || 0 }}</span>
+          <span v-else>📝 {{ item.postCount || 0 }}</span>
 
-    <span v-if="item.type === 'post'" @click="toggleCollect(item)">⭐ {{ item.collectCount || 0 }}</span>
-    <span v-else>帖子 {{ item.postCount || 0 }}</span>
-  </div>
-  <!-- 创建者姓名和创建时间 -->
-  <div class="item-footer">
-    <span class="author">{{ item.authorName || '匿名' }}</span>
-    <span class="publish-time">{{ formatTime(item.createTime) }}</span>
-  </div>
-</article>
+          <!-- 关注/取消关注按钮 -->
+          <span v-if="item.type === 'topic'" @click="toggleFollow(item)">
+            👀 {{ item.followCount || 0  }} {{ currentTab === 'follow' ? '取消关注' : '' }} 
+          </span>
+          <span v-else>💬 {{ item.commentCount || 0 }}</span>
+        </div>
+
+        <!-- 创建者信息 -->
+        <div class="item-footer">
+          <span class="author">{{ item.authorName || '匿名' }}</span>
+          <span class="publish-time">{{ formatTime(item.createTime) }}</span>
+        </div>
+      </article>
 
       <!-- 分页器 -->
       <div class="pagination-container">
@@ -108,19 +113,21 @@
         <button class="confirm-btn" @click="closeErrorModal">确定</button>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, reactive } from 'vue'
-import { useRouter } from 'vue-router'
 import { 
-  getFeedList, createPost, createTopic, updateLike, 
-  updateCollect
+  getFeedList, getUserFollows, createPost, createTopic, 
+  updateLike, updateCollect, updateFollow
 } from '@/api/home'
+import { useUserStore } from '@/stores/userStore'
 
-const router = useRouter()
+const userStore = useUserStore()
+
+// 获取当前用户ID
+const userId = userStore.userId
 
 // 顶部标签
 const tabs = [
@@ -130,31 +137,29 @@ const tabs = [
   { key: 'topic', label: '话题' }
 ]
 
-const currentTab = ref('post')  // 默认显示帖子
-const currentSort = ref('hot') // 默认按热度排序  hot/time
+const currentTab = ref('post')
+const currentSort = ref('hot')
 
 // 信息流数据
-const feed = ref([])  // 信息流数据
-const page = ref(1)  // 当前页码
-const pageSize = ref(5)  // 每页大小
-const noMore = ref(false)  // 是否没有更多数据  
-const loading = ref(true)  // 是否要处于加载中
-const totalPages = ref(1)  // 总页数
-const currentPage = ref(1)  // 当前页码
+const feed = ref([])
+const page = ref(1)
+const pageSize = ref(5)
+const loading = ref(true)
+const totalPages = ref(1)
+const currentPage = ref(1)
 
-// 创建模态框相关
-const showCreateModal = ref(false)  // 是否显示创建模态框
-const modalTitle = ref('')  // 模态框标题
-const newItem = reactive({   // 创建项
+// 创建模态框
+const showCreateModal = ref(false)
+const modalTitle = ref('')
+const newItem = reactive({
   type: '',
   title: '',
   content: ''
 })
 
-// 错误弹窗相关
+// 错误弹窗
 const showErrorModal = ref(false)
 const errorMessage = ref('')
-const showErrorPopup = ref(true) // 控制是否显示错误弹窗的变量
 
 onMounted(() => {
   fetchFeed()
@@ -165,28 +170,30 @@ function switchTab(key) {
   currentTab.value = key
   page.value = 1
   currentPage.value = 1
-  noMore.value = false  
   feed.value = []
   fetchFeed()
 }
 
 // 获取内容列表
 async function fetchFeed() {
-  loading.value = true  // 显示加载中
+  loading.value = true
   try {
-    const params = {
-      tab: currentTab.value,  // 标签
-      sort: currentSort.value,  // 排序
-      page: page.value,  // 页码
-      size: pageSize.value  // 每页大小
+    let response
+    if (currentTab.value === 'follow') {
+        response = await getUserFollows(userId)// ⚠️ 这里的 userId 应该从登录态取
+    } 
+    else {
+      response = await getFeedList({
+        tab: currentTab.value,
+        sort: currentSort.value,
+        page: page.value,
+        size: pageSize.value
+      })
     }
-    // 先使用静态数据数据
-    // const response = feedData;
-    const response = await getFeedList(params)
+    console.log('获取内容列表:', response)
     if (response.code === 1) {
       const data = response.data
       feed.value = data.list
-      console.log(data)
       totalPages.value = data.pages
       currentPage.value = data.pageNum
     }
@@ -197,84 +204,80 @@ async function fetchFeed() {
   }
 }
 
-// 分页切换
+// 分页
 function changePage(newPage) {
   if (newPage >= 1 && newPage <= totalPages.value) {
     page.value = newPage
     currentPage.value = newPage
     fetchFeed()
   }
-  else if (newPage > totalPages.value || newPage < 1) {
-    errorMessage.value = '页码超出范围'
-  }
-  else{
-    errorMessage.value = '页码转换有误！'
-  }
 }
 
-// 格式化时间显示
+// 格式化时间
 function formatTime(time) {
   const now = new Date()
   const publishTime = new Date(time)
   const diff = now - publishTime
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  
-  if (days === 0) {
-    return '今天发布'
-  } else if (days === 1) {
-    return '昨天发布'
-  } else if (days < 7) {
-    return `${days}天前发布`
-  } else {
-    return publishTime.toLocaleDateString()
-  }
+  if (days === 0) return '今天发布'
+  if (days === 1) return '昨天发布'
+  if (days < 7) return `${days}天前发布`
+  return publishTime.toLocaleDateString()
 }
 
-// 点赞/取消点赞
+// 点赞
 async function toggleLike(item) {
   try {
     const response = await updateLike({
+      userId: userId,
       entityType: item.type === 'post' ? 1 : 2,
       entityId: item.id
     })
-    
-    if (response.code === 200) {
-      // 更新本地数据
-      const index = feed.value.findIndex(i => i.id === item.id && i.type === item.type)
-      if (index !== -1) {
-        feed.value[index].likeCount += response.data.liked ? 1 : -1
-      }
+    console.log('点赞:', response)
+    if (response.code === 1) {
+      fetchFeed();
     }
   } catch (error) {
-    console.error('操作失败:', error)
-    if (showErrorPopup.value) {
-      errorMessage.value = '点赞操作失败: ' + error.message
-      showErrorModal.value = true
-    }
+    errorMessage.value = '点赞失败: ' + error.message
+    showErrorModal.value = true
   }
 }
 
-// 收藏/取消收藏
+// 收藏
 async function toggleCollect(item) {
   try {
     const response = await updateCollect({
-      entityType: item.type === 'post' ? 1 : 2,
+      userId: userId,
       entityId: item.id
     })
-    
-    if (response.code === 200) {
-      // 更新本地数据
-      const index = feed.value.findIndex(i => i.id === item.id && i.type === item.type)
-      if (index !== -1) {
-        feed.value[index].collectCount += response.data.collected ? 1 : -1
+    console.log('收藏:', response)
+    if (response.code === 1) {
+      // item.collectCount += response.data.collected ? 1 : -1;
+      fetchFeed();
+    }
+  } catch (error) {
+    errorMessage.value = '收藏失败: ' + error.message
+    showErrorModal.value = true
+  }
+}
+
+// 关注/取消关注
+async function toggleFollow(item) {
+  try {
+    const response = await updateFollow({
+      userId: userId,
+      entityId: item.id
+    })
+    console.log('关注:', response);
+    if (response.code === 1) {
+      if (currentTab.value === 'follow') {
+        // feed.value = feed.value.filter(f => f.id !== item.id);
+        fetchFeed();
       }
     }
   } catch (error) {
-    console.error('操作失败:', error)
-    if (showErrorPopup.value) {
-      errorMessage.value = '收藏操作失败: ' + error.message
-      showErrorModal.value = true
-    }
+    errorMessage.value = '关注失败: ' + error.message
+    showErrorModal.value = true
   }
 }
 
@@ -290,134 +293,31 @@ function openCreateModal(type) {
 // 提交新帖子/话题
 async function submitNewItem() {
   if (!newItem.title.trim() || !newItem.content.trim()) return
-  
   try {
     const api = newItem.type === 'post' ? createPost : createTopic
     const response = await api({
       title: newItem.title,
       content: newItem.content
     })
-    
     if (response.code === 200) {
       showCreateModal.value = false
-      // 刷新列表
-      page.value = 1
       fetchFeed()
     }
   } catch (error) {
-    console.error('创建失败:', error)
-    if (showErrorPopup.value) {
-      errorMessage.value = '创建失败: ' + error.message
-      showErrorModal.value = true
-    }
+    errorMessage.value = '创建失败: ' + error.message
+    showErrorModal.value = true
   }
-}
-
-// 关闭错误弹窗
-function closeErrorModal() {
-  showErrorModal.value = false
-  errorMessage.value = ''
 }
 
 // 发布功能
 const createNewPost = () => openCreateModal('post')
 const createNewTopic = () => openCreateModal('topic')
 
-const feedData = {
-  code: 1,
-  message: "success",
-  data: {
-    list: [
-      // 帖子数据
-      {
-        id: 1,
-        type: 'post',
-        title: '如何学习Vue3？',
-        summary: 'Vue3是目前最流行的前端框架之一，本文将介绍如何快速上手Vue3...',
-        viewCount: 1250,
-        likeCount: 42,
-        commentCount: 18,
-        collectCount: 25,
-        authorName: '张三',
-        createTime: '2023-10-15T10:30:00'
-      },
-      {
-        id: 2,
-        type: 'post',
-        title: 'React Hooks最佳实践',
-        summary: '在React开发中，Hooks已经成为标准，本文分享一些实用的最佳实践...',
-        viewCount: 980,
-        likeCount: 36,
-        commentCount: 12,
-        collectCount: 20,
-        authorName: '李四',
-        createTime: '2023-10-14T14:20:00'
-      },
-      {
-        id: 3,
-        type: 'post',
-        title: 'Node.js性能优化技巧',
-        summary: '在实际项目中，我们经常需要对Node.js应用进行性能优化，以下是一些实用技巧...',
-        viewCount: 1560,
-        likeCount: 58,
-        commentCount: 22,
-        collectCount: 35,
-        authorName: '王五',
-        createTime: '2023-10-13T09:15:00'
-      },
-      // 话题数据
-      {
-        id: 101,
-        type: 'topic',
-        title: '全栈开发',
-        summary: '全栈开发相关讨论，涵盖前端、后端、数据库等技术栈...',
-        viewCount: 500,
-        likeCount: 10,
-        followCount: 120,
-        postCount: 50,
-        authorName: '赵六',
-        createTime: '2023-09-01T08:00:00'
-      },
-      {
-        id: 102,
-        type: 'topic',
-        title: '后端架构',
-        summary: '后端架构设计与实践，包括微服务、分布式系统等...',
-        viewCount: 800,
-        likeCount: 20,
-        followCount: 200,
-        postCount: 80,
-        authorName: '钱七',
-        createTime: '2023-08-20T16:45:00'
-      },
-      {
-        id: 103,
-        type: 'topic',
-        title: '前端框架',
-        summary: '前端框架比较和最佳实践，React、Vue、Angular等框架的使用经验分享...',
-        viewCount: 600,
-        likeCount: 30,
-        followCount: 150,
-        postCount: 60,
-        authorName: '孙八',
-        createTime: '2023-09-10T11:30:00'
-      }
-    ],
-    pageNum: 1,
-    pageSize: 6,
-    size: 6,
-    startRow: 1,
-    endRow: 6,
-    pages: 2,
-    prePage: 0,
-    nextPage: 2,
-    isFirstPage: true,
-    isLastPage: false,
-    hasPreviousPage: false,
-    hasNextPage: true
-  }
-};
-
+// 关闭错误弹窗
+function closeErrorModal() {
+  showErrorModal.value = false
+  errorMessage.value = ''
+}
 </script>
 
 <style scoped>
