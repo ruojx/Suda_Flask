@@ -7,10 +7,10 @@ import {
   createFileApi, createLinkApi, tagListApi
 } from '@/api/resource'
 import dayjs from "dayjs"
+import { useUserStore } from '@/stores/userStore'
 
-const loginUser = JSON.parse(localStorage.getItem('loginUser'))
-const userName = loginUser.name || '匿名用户'
-
+const userStore = useUserStore()
+const userName = userStore.userName
 /** ====== 上传弹窗 ====== */
 const uploader = ref({
   open: false,

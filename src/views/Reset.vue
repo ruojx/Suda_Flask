@@ -1,285 +1,193 @@
+<!-- /src/views/Reset.vue -->
 <script setup>
-import { useRouter, useRoute } from 'vue-router'
-import { ref, computed } from 'vue'
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { resetApi } from '@/api/public'
+import { useUserStore } from '@/stores/userStore'
+// import { resetByOldPwdApi } from '@/api/public' // 如已实现后端接口，取消注释
 
 const router = useRouter()
-const route = useRoute()
+const userStore = useUserStore()
 
-const mode = ref(route.query.mode || 'modify')  // 默认修改密码
-const role = ref(Number(route.query.role || ''))
-const titleText = computed(() => {
-  return mode.value === 'forget' ? '找回密码' : '修改密码'
-})
-const selectedRole = computed(() => {
-  switch (role.value) {
-    case 1:
-      return 'student'
-    case 2:
-      return 'teacher'
-    case 3:
-      return 'admin'
-  }
-})
-const roleLabel = computed(() => {
-  switch (role.value) {
-    case 1:
-      return '学生'
-    case 2:
-      return '教工'
-    case 3:
-      return '管理员'
-    default:
-      return '用户'
-  }
-})
-const loginUser = JSON.parse(localStorage.getItem('loginUser') || '{}')
-
-// 表单数据，根据模式使用不同字段
-const form = ref({
-  id: loginUser.id,
-  role: role.value,
-  identifier: '',      // 忘记密码模式填写
-  oldPassword: '',     // 修改密码模式填写
+// ====== 使用旧密码修改 ======
+const formRef = ref()
+const form = reactive({
+  username: '',
+  oldPassword: '',
   newPassword: '',
-  repeatPassword: ''
+  confirmPwd: ''
 })
-
-// 确认按钮逻辑
-const sure = async () => {
-  if (!form.value.newPassword || !form.value.repeatPassword) {
-    ElMessage.error('新密码不能为空')
-    return
-  }
-
-  if (form.value.newPassword !== form.value.repeatPassword) {
-    ElMessage.error('两次密码不一致')
-    return
-  }
-
-  if (mode.value === 'forget' && !form.value.identifier) {
-    ElMessage.error(`请填写${roleLabel.value}号`)
-    return
-  }
-  else if (mode.value === 'modify' && !form.value.oldPassword) {
-    ElMessage.error('请输入原密码')
-    return
-  }
-  const result = await resetApi(form.value);
-  if (result.code) {
-    ElMessage.success('密码重置成功')
-  }
-  else {
-    ElMessage.error(`无法更新，请检查后重新操作`)
-    if (mode.value === 'forget') {
-      router.push('/')
+const rules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, max: 32, message: '长度 6~32 个字符', trigger: 'blur' }
+  ],
+  confirmPwd: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    {
+      validator: (_, v, cb) => {
+        if (!v) return cb(new Error('请再次输入新密码'))
+        if (v !== form.newPassword) return cb(new Error('两次输入的密码不一致'))
+        cb()
+      },
+      trigger: 'blur'
     }
-    else {
-      router.push(`/${selectedRole.value}`)
-    }
+  ]
+}
+
+// 提交：旧密码修改
+const submit = async () => {
+  await formRef.value?.validate()
+  try {
+    // 若已接后端，请改为实际接口调用
+    // const res = await resetByOldPwdApi({
+    //   username: form.username,
+    //   oldPassword: form.oldPassword,
+    //   newPassword: form.newPassword
+    // })
+    // if (res?.code === 1) {
+    //   ElMessage.success('密码修改成功，请重新登录')
+    //   userStore.clearUser?.()
+    //   window.dispatchEvent(new Event('auth:changed'))
+    //   router.replace('/login')
+    // } else {
+    //   ElMessage.error(res?.msg || '修改失败')
+    // }
+
+    // 演示用本地分支（无后端）
+    ElMessage.success('（演示）密码修改成功，请重新登录')
+    userStore.clearUser?.()
+    window.dispatchEvent(new Event('auth:changed'))
+    router.replace('/login')
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('修改失败，请稍后重试')
   }
 }
 
-// 返回按钮
-const back = () => {
-  router.back()
-}
+// 返回
+const back = () => router.push('/login')
 </script>
 
 <template>
   <div id="container">
     <div class="reset-form page-transition">
-      <el-form label-width="80px">
-        <p class="title">{{ titleText }}</p>
-
-        <el-form-item v-if="mode === 'forget'" :label="`${roleLabel}号`">
-          <el-input v-model="form.identifier" :placeholder="`请输入${roleLabel}号`" />
+      <p class="title">修改密码</p>
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
+        <el-form-item label="用户名" prop="username">
+          <el-input v-model="form.username" placeholder="请输入用户名" clearable />
         </el-form-item>
 
-        <el-form-item v-if="mode === 'modify'" label="原密码">
-          <el-input v-model="form.oldPassword" type="password" placeholder="请输入原密码" />
+        <el-form-item label="旧密码" prop="oldPassword">
+          <el-input v-model="form.oldPassword" type="password" show-password placeholder="请输入旧密码" />
         </el-form-item>
 
-        <el-form-item label="新密码">
-          <el-input v-model="form.newPassword" type="password" placeholder="请输入新密码" />
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="form.newPassword" type="password" show-password placeholder="请输入新密码（6~32位）" />
         </el-form-item>
 
-        <el-form-item label="确认密码">
-          <el-input v-model="form.repeatPassword" type="password" placeholder="请再次输入新密码" />
+        <el-form-item label="确认密码" prop="confirmPwd">
+          <el-input v-model="form.confirmPwd" type="password" show-password placeholder="请再次输入新密码" />
         </el-form-item>
 
         <div class="button-group">
-          <el-button class="reset-button back-btn" @click="back">返回</el-button>
-          <el-button class="reset-button confirm-btn" type="primary" @click="sure">确认</el-button>
+          <el-button class="btn back-btn" @click="back">返回</el-button>
+          <el-button class="btn primary" type="primary" @click="submit">确认修改</el-button>
         </div>
       </el-form>
+
+      <div class="hint">
+        <span>忘记密码？请联系管理员协助重置。</span>
+      </div>
     </div>
   </div>
 </template>
 
-<!-- <style scoped>
-#container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
-  padding: 90px 20px 20px 20px;
-  width: 100%;
-}
-
-.reset-form {
-  width: 370px;
-  background: rgba(255,255,255,0.92);
-  padding: 36px 32px 28px 32px;
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.13);
-  position: relative;
-  backdrop-filter: blur(6px);
-  margin-top: 90px;
-}
-
-.page-transition {
-  animation: page-fade-in 0.7s cubic-bezier(.4,0,.2,1);
-}
-
-@keyframes page-fade-in {
-  0% { opacity: 0; transform: translateY(40px) scale(0.98); }
-  100% { opacity: 1; transform: none; }
-}
-
-@keyframes card-fade-in {
-  0% { opacity: 0; transform: translateY(40px) scale(0.98); }
-  100% { opacity: 1; transform: none; }
-}
-
-.title {
-  text-align: center;
-  font-size: 26px;
-  font-weight: 700;
-  margin-bottom: 24px;
-  color: var(--student-color);
-  letter-spacing: 0.04em;
-}
-
-.el-form-item {
-  margin-bottom: 18px;
-}
-
-.button-group {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  margin-top: 24px;
-}
-
-.reset-button {
-  flex: 1;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  border: none;
-  padding: 12px 24px;
-}
-
-.back-btn {
-  background: #f5f5f5;
-  color: #666;
-}
-
-.back-btn:hover {
-  background: #e8e8e8;
-  transform: translateY(-1px);
-}
-
-.confirm-btn {
-  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-  color: #fff;
-}
-
-.confirm-btn:hover {
-  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
-  transform: translateY(-1px);
-}
-</style> -->
-
 <style scoped>
 #container {
+  min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  min-height: 100vh;
-  padding: 90px 20px 20px 20px;
-  width: 100%;
+  align-items: center;
+  padding: 24px 12px;
+  background-image: url("@/assets/login_bg.jpg");
 }
-
 .reset-form {
-  width: 370px;
+  width: 460px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
   background: #fff;
-  padding: 36px 32px 28px 32px;
-  border-radius: 20px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-  position: relative;
-  margin-top: 90px;
-}
-
-.page-transition {
-  animation: page-fade-in 0.7s cubic-bezier(.4,0,.2,1);
-}
-
-@keyframes page-fade-in {
-  0% { opacity: 0; transform: translateY(40px) scale(0.98); }
-  100% { opacity: 1; transform: none; }
+  padding: 28px 24px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 .title {
-  text-align: center;
-  font-size: 26px;
+  margin: 2px 0 18px;
+  font-size: 20px;
   font-weight: 700;
-  margin-bottom: 24px;
-  color: #333;
-  letter-spacing: 0.04em;
+  text-align: center;
+  color: #111;
 }
 
+/* 表单状态 */
 .el-form-item {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
+:deep(.el-form-item__label) {
+  color: #444;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #d1d5db inset;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #9ca3af inset;
+}
+
+:deep(.is-focus .el-input__wrapper) {
+  box-shadow: 0 0 0 2px #1e80ff inset;
+}
+
+/* 按钮组 */
 .button-group {
   display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  margin-top: 24px;
+  gap: 10px;
+  margin-top: 6px;
 }
 
-.reset-button {
+.btn {
   flex: 1;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  border: none;
-  padding: 12px 24px;
+  height: 40px;
+  border-radius: 8px;
+  font-size: 15px;
 }
 
-.back-btn {
-  background: #f0f0f0;
-  color: #666;
-}
-
-.back-btn:hover {
-  background: #e0e0e0;
-  transform: translateY(-1px);
-}
-
-.confirm-btn {
-  background: #333;
+.primary {
+  background: #1e80ff;
+  border-color: #1e80ff;
   color: #fff;
 }
 
-.confirm-btn:hover {
-  background: #444;
-  transform: translateY(-1px);
+.back-btn {
+  background: #f5f7fa;
+  color: #111;
+  border-color: #e5e7eb;
+}
+
+.back-btn:hover {
+  background: #e5e7eb;
+}
+
+/* 底部提示 */
+.hint {
+  text-align: center;
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 13px;
 }
 </style>

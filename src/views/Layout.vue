@@ -11,7 +11,7 @@ const navs = [
   { label: '首页', path: '/home' },
   { label: '资源', path: '/resource' },
   { label: '讨论', path: '/chat' },
-  { label: '咨询', path: '/Consultation' }
+  // { label: '咨询', path: '/Consultation' }
 ]
 
 const keyword = ref('')
@@ -126,8 +126,9 @@ const loginLink = computed(() => ({
                 <img :src="avatarUrl" alt="avatar" />
               </div>
               <ul v-show="menuOpen" class="dropdown" @click.stop>
-                <li><router-link to="/user/me">我的主页</router-link></li>
-                <li><router-link to="/settings/profile">设置</router-link></li>
+                <li><router-link to="/me">我的主页</router-link></li>
+                <li><router-link to="/settings">设置</router-link></li>
+                <li><router-link to="/reset">修改密码</router-link></li>
                 <li class="divider"></li>
                 <li><a href="javascript:void(0)" @click="logout">退出登录</a></li>
               </ul>
@@ -213,6 +214,7 @@ const loginLink = computed(() => ({
 }
 
 .logo-text {
+  margin-right: 30px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: .2px;
@@ -224,7 +226,7 @@ const loginLink = computed(() => ({
 }
 
 .nav-link {
-  padding: 6px 10px;
+  padding: 6px 20px;
   border-radius: 8px;
   color: var(--muted);
   text-decoration: none;

@@ -1,19 +1,21 @@
-import { createRouter, createWebHistory /* 或 createWebHashHistory */ } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 const routes = [
-  // 公共页（任何人可见）
-  { path: '/login', name: 'Login', component: () => import('@/views/Login.vue') },
   {
     path: '/',
     component: () => import('@/views/Layout.vue'),
     redirect: '/home',
     children: [
-      { path: '/reset', name: 'Reset', component: () => import('@/views/Reset.vue') },
+      { path: 'login', name: 'Login', component: () => import('@/views/Login.vue') },
+      { path: 'register', name: 'Register', component: () => import('@/views/Register.vue') },
       { path: 'home', name: 'Home', component: () => import('@/views/Home.vue') },
+      { path: 'reset', name: 'Reset', component: () => import('@/views/Reset.vue')},
       { path: 'resource', name: 'Resource', component: () => import('@/views/Resource.vue') },
       { path: 'chat', name: 'Chat', component: () => import('@/views/Chat.vue') },
+      { path: 'me', name: 'Me', component: () => import('@/views/Me.vue') },
       { path: 'consultation', name: 'Consultation', component: () => import('@/views/Consultation.vue') },
+      { path: 'settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
     ]
   },
 
@@ -34,7 +36,7 @@ router.beforeEach((to, from, next) => {
     return next({ path: '/login', query: { redirect: to.fullPath } })
   }
 
-  if (token && (to.path === '/login' || to.path === '/reset')) {
+  if (token && (to.path === '/login')) {
     return next('/home')
   }
 

@@ -10,8 +10,8 @@ const userStore = useUserStore() // 获取 Pinia store 实例
 
 // 登录表单数据
 const loginForm = reactive({
-  username: '',
-  password: ''
+  username: '1',
+  password: '1'
 })
 
 // 登录处理
