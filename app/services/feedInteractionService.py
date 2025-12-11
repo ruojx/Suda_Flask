@@ -71,34 +71,62 @@ class InteractionService:
     
     @staticmethod
     def toggle_follow(entity_id, user_id):
-        record = FeedFollow.query.filter_by(
-            user_id=user_id, 
-            entity_id=entity_id
-        ).first()
+        from app.extensions import db
+        from app.models.feedModels import FeedFollow, Topic
         
-        delta = 0
-        if record:
-            # 切换关注状态
-            record.status = 1 if record.status == 0 else 0
-            delta = 1 if record.status == 1 else -1
-        else:
-            # 创建新的关注记录
-            db.session.add(FeedFollow(
+        try:
+            # 查找现有记录
+            record = FeedFollow.query.filter_by(
                 user_id=user_id, 
-                entity_id=entity_id, 
-                status=1
-            ))
-            delta = 1
-        
-        # 更新话题关注计数
-        if delta != 0:
-            topic = Topic.query.get(entity_id)
-            if topic: 
-                topic.follow_count = max(0, topic.follow_count + delta)
-        
-        db.session.commit()
-        return {"success": True, "message": "操作成功"}
-    
+                entity_id=entity_id
+            ).first()
+            
+            delta = 0
+            is_following = False
+            
+            if record:
+                # 切换关注状态
+                if record.status == 1:
+                    # 取消关注
+                    record.status = 0
+                    delta = -1
+                    is_following = False
+                else:
+                    # 重新关注
+                    record.status = 1
+                    delta = 1
+                    is_following = True
+            else:
+                # 创建新的关注记录
+                db.session.add(FeedFollow(
+                    user_id=user_id, 
+                    entity_id=entity_id, 
+                    status=1
+                ))
+                delta = 1
+                is_following = True
+            
+            # 更新话题关注计数
+            if delta != 0:
+                topic = Topic.query.get(entity_id)
+                if topic: 
+                    topic.follow_count = max(0, (topic.follow_count or 0) + delta)
+            
+            db.session.commit()
+            
+            return {
+                "success": True, 
+                "message": "操作成功",
+                "isFollowing": is_following,
+                "newFollowCount": topic.follow_count if topic else 0
+            }
+            
+        except Exception as e:
+            db.session.rollback()
+            return {
+                "success": False, 
+                "message": f"操作失败: {str(e)}"
+            }
     @staticmethod
     def add_comment(entity_type, entity_id, user_id, content):
         # 创建评论
