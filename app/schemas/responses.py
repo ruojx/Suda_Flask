@@ -14,7 +14,7 @@ class LoginVOSchema(Schema):
 
 class FeedSchema(BaseResponseSchema):
     id = fields.Int()
-    type = fields.Str() # 'post' or 'topic'
+    type = fields.Str() # '1为post' or '2为topic'
     title = fields.Str()
     summary = fields.Str()
     author_name = fields.Str(data_key="authorName")
@@ -27,6 +27,8 @@ class FeedSchema(BaseResponseSchema):
     # Topic fields
     follow_count = fields.Int(data_key="followCount", dump_default=0)
     post_count = fields.Int(data_key="postCount", dump_default=0)
+    # 添加用户是否关注该话题的字段
+    is_followed = fields.Bool(data_key="isFollowed", dump_default=False)
 
 class ResourceVOSchema(BaseResponseSchema):
     id = fields.Int()
