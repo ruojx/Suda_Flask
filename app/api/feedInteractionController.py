@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from app.services.interaction_service import InteractionService
+from app.services.feedInteractionService import InteractionService
 from app.utils.result import Result
 from app.schemas.requests import InteractionRequestSchema
 

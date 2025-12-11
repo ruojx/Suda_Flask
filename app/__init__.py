@@ -16,10 +16,10 @@ def create_app():
 
     # 注册蓝图 (Controllers)
     from app.api.auth import auth_bp
-    from app.api.feed import feed_bp
+    from app.api.feedController import feed_bp
     from app.api.resource import resource_bp
     from app.api.chat import chat_bp
-    from app.api.interaction import interaction_bp
+    from app.api.feedInteractionController import interaction_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(feed_bp)

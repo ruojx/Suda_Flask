@@ -1,5 +1,5 @@
 from flask import Blueprint, request
-from app.services.feed_service import FeedService
+from app.services.feedService import FeedService
 from app.utils.result import Result
 from app.utils.context import get_current_user_id
 from app.schemas.requests import PostRequestSchema, TopicRequestSchema

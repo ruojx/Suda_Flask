@@ -1,4 +1,4 @@
-from app.models.feed import FeedView, Post, Topic, FeedLike, FeedFollow, FeedCollect, FeedComment, PostTopicRelation
+from app.models.feedModels import FeedView, Post, Topic, FeedLike, FeedFollow, FeedCollect, FeedComment, PostTopicRelation
 from app.extensions import db
 
 class InteractionService:

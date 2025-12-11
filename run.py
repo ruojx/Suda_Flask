@@ -1,6 +1,6 @@
 from app import create_app, db
 from app.models.user import User
-from app.models.feed import Post, Topic, FeedLike, FeedCollect, FeedFollow, FeedComment, PostTopicRelation, FeedView
+from app.models.feedModels import Post, Topic, FeedLike, FeedCollect, FeedFollow, FeedComment, PostTopicRelation, FeedView
 from app.models.resource import Resource, ResourceLike, ResourceFavorite
 from app.models.im import Conversation, ConversationMember, Message
 from datetime import datetime, timedelta
