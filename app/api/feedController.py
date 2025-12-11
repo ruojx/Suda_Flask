@@ -29,10 +29,12 @@ def list_feed():
     
     # 调试输出，查看是否包含isFollowed字段
     if tab == 'topic' and current_user_id:
+        print("=========================================")
         print(f"DEBUG: 话题列表序列化后检查isFollowed字段:")
         for i, item in enumerate(serialized_list):
             if item.get('type') == 'topic':
                 print(f"  话题 {item.get('title')} - isFollowed: {item.get('isFollowed')}")
+        print("=========================================")
     
     return Result.success(data)
 @feed_bp.route('/follow', methods=['GET'])

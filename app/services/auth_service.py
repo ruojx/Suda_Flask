@@ -7,11 +7,12 @@ from app.extensions import db
 # 白名单路径
 WHITELIST = [
     "/login", "/register", "/static", 
-    "/api/feed/list", "/api/feed/search", 
+    "/api/feed/search", 
     "/api/feed/tags/hot", "/api/feed/post/<int:post_id>",
     "/api/feed/topic/<int:topic_id>"
 ]
 
+# auth_service.py 中的 auth_middleware
 def auth_middleware():
     """ 鉴权中间件 """
     path = request.path
@@ -23,15 +24,20 @@ def auth_middleware():
             return None
 
     token = request.headers.get('token')
+    print(f"DEBUG: 请求路径 {path} - token: {token[:20] if token else 'None'}")  # 调试
+    
     if not token:
         return jsonify({"code": 0, "msg": "未登录"}), 401
 
     payload = parse_token(token)
+    print(f"DEBUG: token解析结果: {payload}")  # 调试
+    
     if not payload:
         return jsonify({"code": 0, "msg": "Token失效"}), 401
     
     # 存入 Flask 全局变量
     g.user_id = payload.get('id')
+    print(f"DEBUG: 设置 g.user_id = {g.user_id}")  # 调试
 
 class AuthService:
     @staticmethod
