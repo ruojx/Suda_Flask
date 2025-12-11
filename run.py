@@ -1,10 +1,11 @@
 from app import create_app, db
 from app.models.user import User
-from app.models.feed import FeedView, Post, Topic, FeedLike, FeedFollow, FeedCollect, FeedComment, PostTopicRelation
-from app.models.resource import Resource
-from app.models.community import Question, Answer # 假设你建了这个文件，如果没有可以删掉这两行
-from datetime import datetime
+from app.models.feed import Post, Topic, FeedLike, FeedCollect, FeedFollow, FeedComment, PostTopicRelation, FeedView
+from app.models.resource import Resource, ResourceLike, ResourceFavorite
+from app.models.im import Conversation, ConversationMember, Message
+from datetime import datetime, timedelta
 import os
+import random
 
 app = create_app()
 
@@ -159,8 +160,6 @@ def init_db_data():
     if not FeedView.query.first():
         print("⚡️ 正在初始化访问记录数据...")
         # 为部分帖子和话题添加初始访问记录
-        import random
-        from datetime import datetime, timedelta
         
         view_records = []
         
@@ -168,7 +167,7 @@ def init_db_data():
         posts = Post.query.all()
         for post in posts:
             # 每个帖子有 10-50 次访问记录
-            for i in range(random.randint(10, 50)):
+            for _ in range(random.randint(10, 50)):
                 # 随机选择一个用户（可能包括未登录用户 user_id=0）
                 user_id = random.choice([0, 11, 22, 33, 44, 55])
                 
@@ -194,7 +193,7 @@ def init_db_data():
         topics = Topic.query.all()
         for topic in topics:
             # 每个话题有 20-100 次访问记录
-            for i in range(random.randint(20, 100)):
+            for _ in range(random.randint(20, 100)):
                 # 随机选择一个用户
                 user_id = random.choice([0, 11, 22, 33, 44, 55])
                 
@@ -256,7 +255,6 @@ def init_db_data():
         db.session.add_all(resources)
         db.session.commit()
         print(f"✅ 已创建 {len(resources)} 个资源")
-
 if __name__ == '__main__':
     # 确保上传目录存在
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -273,5 +271,5 @@ if __name__ == '__main__':
             print(f"❌ 数据初始化部分失败 (可能是部分表已存在数据): {e}")
 
     print("🚀 服务已启动: http://0.0.0.0:5000")
-    print("👉 测试账号: 1 / 密码: 1")
+    print("👉 测试账号: 11 / 密码: 11")
     app.run(debug=True, host='0.0.0.0', port=5000)

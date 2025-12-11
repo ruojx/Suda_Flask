@@ -1,17 +1,16 @@
-from app.models.feed import Post, Topic, LikeTable, Collect
-from app.models.user import Follow
+from app.models.feed import FeedView, Post, Topic, FeedLike, FeedFollow, FeedCollect, FeedComment, PostTopicRelation
 from app.extensions import db
 
 class InteractionService:
     @staticmethod
     def toggle_like(entity_type, entity_id, user_id):
-        record = LikeTable.query.filter_by(user_id=user_id, entity_type=entity_type, entity_id=entity_id).first()
+        record = FeedLike.query.filter_by(user_id=user_id, entity_type=entity_type, entity_id=entity_id).first()
         delta = 0
         if record:
             record.status = 1 if record.status == 0 else 0
             delta = 1 if record.status == 1 else -1
         else:
-            db.session.add(LikeTable(user_id=user_id, entity_type=entity_type, entity_id=entity_id, status=1))
+            db.session.add(FeedLike(user_id=user_id, entity_type=entity_type, entity_id=entity_id, status=1))
             delta = 1
         
         # 更新计数
