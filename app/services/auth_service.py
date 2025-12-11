@@ -5,7 +5,12 @@ from app.utils.jwt_utils import create_token
 from app.extensions import db
 
 # 白名单路径
-WHITELIST = ["/login", "/register", "/static", "/api/feed/list"]
+WHITELIST = [
+    "/login", "/register", "/static", 
+    "/api/feed/list", "/api/feed/search", 
+    "/api/feed/tags/hot", "/api/feed/post/<int:post_id>",
+    "/api/feed/topic/<int:topic_id>"
+]
 
 def auth_middleware():
     """ 鉴权中间件 """
