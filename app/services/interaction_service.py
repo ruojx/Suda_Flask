@@ -1,4 +1,4 @@
-from app.models.content import Post, Topic, LikeTable, Collect
+from app.models.feed import Post, Topic, LikeTable, Collect
 from app.models.user import Follow
 from app.extensions import db
 

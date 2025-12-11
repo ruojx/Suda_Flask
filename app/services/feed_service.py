@@ -1,4 +1,4 @@
-from app.models.content import Post, Topic
+from app.models.feed import Post, Topic
 from sqlalchemy import desc, or_
 from app.extensions import db
 
