@@ -20,11 +20,13 @@ def create_app():
     from app.api.resource import resource_bp
     from app.api.chat import chat_bp
     from app.api.feedInteractionController import interaction_bp
+    from app.api.feedSearchController import feed_search_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(feed_bp)
     app.register_blueprint(resource_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(interaction_bp)
+    app.register_blueprint(feed_search_bp)
 
     return app
