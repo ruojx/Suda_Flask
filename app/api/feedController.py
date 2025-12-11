@@ -15,14 +15,56 @@ def list_feed():
     page = int(request.args.get('page', 1))
     size = int(request.args.get('size', 10))
     
-    data = FeedService.get_feed_list(tab, sort, page, size)
-    # data 中已经是 list 字典，并包含 type，直接使用 Schema 序列化 list 部分
-    # 但由于 data 结构复杂 (PageInfo)，这里直接返回字典结构，仅对 list 内部元素序列化
+    # 获取当前用户ID（从token中获取）
+    from app.utils.context import get_current_user_id
+    current_user_id = get_current_user_id()
+    
+    print(f"DEBUG: 当前用户ID: {current_user_id}, tab: {tab}")  # 调试信息
+    
+    data = FeedService.get_feed_list(tab, sort, page, size, current_user_id)
+    
+    # 序列化结果
     serialized_list = FeedSchema(many=True).dump(data['list'])
-    data['list'] = serialized_list # 替换为前端需要的驼峰格式
+    data['list'] = serialized_list
+    
+    # 调试输出，查看是否包含isFollowed字段
+    if tab == 'topic' and current_user_id:
+        print(f"DEBUG: 话题列表序列化后检查isFollowed字段:")
+        for i, item in enumerate(serialized_list):
+            if item.get('type') == 'topic':
+                print(f"  话题 {item.get('title')} - isFollowed: {item.get('isFollowed')}")
     
     return Result.success(data)
-
+@feed_bp.route('/follow', methods=['GET'])
+def get_user_follows():
+    """
+    获取用户关注的话题
+    """
+    # 尝试从token获取用户ID
+    from app.utils.context import get_current_user_id
+    user_id = get_current_user_id()
+    
+    # 如果提供了userId参数，使用参数（管理员可能查看其他用户）
+    request_user_id = request.args.get('userId')
+    if request_user_id:
+        try:
+            user_id = int(request_user_id)
+        except ValueError:
+            pass
+    
+    if not user_id:
+        return Result.error('请先登录')
+    
+    page = int(request.args.get('page', 1))
+    size = int(request.args.get('size', 10))
+    
+    # 获取用户关注的话题
+    data = FeedService.get_feed_list('follow', 'time', page, size, user_id)
+    
+    serialized_list = FeedSchema(many=True).dump(data['list'])
+    data['list'] = serialized_list
+    
+    return Result.success(data)
 @feed_bp.route('/post', methods=['POST'])
 def create_post():
     data = PostRequestSchema().load(request.get_json())
@@ -34,76 +76,6 @@ def create_topic():
     data = TopicRequestSchema().load(request.get_json())
     tid = FeedService.create_topic(data)
     return Result.success({"id": tid})
-
-@feed_bp.route('/follow', methods=['GET'])
-def get_user_follows():
-    """
-    获取用户关注的话题
-    """
-    user_id = request.args.get('userId')
-    
-    if not user_id:
-        # 尝试从token获取
-        user_id = get_current_user_id()
-        
-    if not user_id:
-        return Result.error('请先登录')
-    
-    page = int(request.args.get('page', 1))
-    size = int(request.args.get('size', 10))
-    
-    # 获取用户关注的话题
-    from app.models.feedModels import FeedFollow, Topic
-    from sqlalchemy import desc
-    
-    # 获取用户关注的话题ID
-    follows = FeedFollow.query.filter_by(
-        user_id=user_id,
-        status=1
-    ).all()
-    
-    topic_ids = [follow.entity_id for follow in follows]
-    
-    if not topic_ids:
-        return Result.success({
-            "list": [],
-            "pageNum": page,
-            "pageSize": size,
-            "total": 0,
-            "pages": 0,
-            "isFirstPage": True,
-            "isLastPage": True
-        })
-    
-    # 查询话题
-    query = Topic.query.filter(
-        Topic.id.in_(topic_ids),
-        Topic.status == 1
-    ).order_by(desc(Topic.create_time))
-    
-    pagination = query.paginate(page=page, per_page=size, error_out=False)
-    
-    # 格式化结果
-    items = []
-    for item in pagination.items:
-        d = {c.name: getattr(item, c.name) for c in item.__table__.columns}
-        d['type'] = 'topic'
-        items.append(d)
-    
-    data = {
-        "list": items,
-        "pageNum": pagination.page,
-        "pageSize": pagination.per_page,
-        "total": pagination.total,
-        "pages": pagination.pages,
-        "isFirstPage": pagination.page == 1,
-        "isLastPage": pagination.page == pagination.pages
-    }
-    
-    serialized_list = FeedSchema(many=True).dump(data['list'])
-    data['list'] = serialized_list
-    
-    return Result.success(data)
 
 @feed_bp.route('/post/<int:post_id>', methods=['GET'])
 def get_post_detail(post_id):

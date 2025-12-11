@@ -38,7 +38,15 @@ def follow():
         return Result.error('参数不完整')
     
     result = InteractionService.toggle_follow(entity_id, user_id)
-    return Result.success(result)
+    
+    if result["success"]:
+        return Result.success({
+            "isFollowing": result["isFollowing"],
+            "newFollowCount": result["newFollowCount"],
+            "message": result["message"]
+        })
+    else:
+        return Result.error(result["message"])
 
 @interaction_bp.route('/comment', methods=['POST'])
 def add_comment():

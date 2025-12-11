@@ -68,7 +68,7 @@ class InteractionService:
         
         db.session.commit()
         return {"success": True, "message": "操作成功"}
-    
+
     @staticmethod
     def toggle_follow(entity_id, user_id):
         from app.extensions import db
@@ -107,10 +107,12 @@ class InteractionService:
                 is_following = True
             
             # 更新话题关注计数
+            new_follow_count = 0
             if delta != 0:
                 topic = Topic.query.get(entity_id)
                 if topic: 
                     topic.follow_count = max(0, (topic.follow_count or 0) + delta)
+                    new_follow_count = topic.follow_count
             
             db.session.commit()
             
@@ -118,7 +120,7 @@ class InteractionService:
                 "success": True, 
                 "message": "操作成功",
                 "isFollowing": is_following,
-                "newFollowCount": topic.follow_count if topic else 0
+                "newFollowCount": new_follow_count
             }
             
         except Exception as e:
@@ -126,7 +128,7 @@ class InteractionService:
             return {
                 "success": False, 
                 "message": f"操作失败: {str(e)}"
-            }
+            }    
     @staticmethod
     def add_comment(entity_type, entity_id, user_id, content):
         # 创建评论

@@ -24,25 +24,55 @@ class FeedService:
         }
     
     @staticmethod
-    def get_feed_list(tab, sort, page, size):
+    def get_feed_list(tab, sort, page, size, current_user_id=None):
         query = None
         item_type = 'post'
         
         if tab == 'follow':
-            # 关注页面 - 获取用户关注的话题
-            # 注意：这里需要user_id，调用时应该传入
-            return {
-                "list": [],
-                "pageNum": page,
-                "pageSize": size,
-                "total": 0,
-                "pages": 0,
-                "isFirstPage": True,
-                "isLastPage": True
-            }
+            # 关注页面 - 需要当前用户ID
+            if not current_user_id:
+                return {
+                    "list": [],
+                    "pageNum": page,
+                    "pageSize": size,
+                    "total": 0,
+                    "pages": 0,
+                    "isFirstPage": True,
+                    "isLastPage": True
+                }
+            
+            # 获取用户关注的话题ID
+            follows = FeedFollow.query.filter_by(
+                user_id=current_user_id,
+                status=1
+            ).all()
+            
+            topic_ids = [follow.entity_id for follow in follows]
+            
+            if not topic_ids:
+                return {
+                    "list": [],
+                    "pageNum": page,
+                    "pageSize": size,
+                    "total": 0,
+                    "pages": 0,
+                    "isFirstPage": True,
+                    "isLastPage": True
+                }
+            
+            # 查询关注的话题
+            query = Topic.query.filter(
+                Topic.id.in_(topic_ids),
+                Topic.status == 1
+            )
+            item_type = 'topic'
+            if sort == 'hot':
+                query = query.order_by(desc(Topic.view_count))
+            else:
+                query = query.order_by(desc(Topic.create_time))
         elif tab == 'recommend':
             # 推荐页面 - 帖子+话题混合，按热度排序
-            return FeedService.get_recommend_feed(sort, page, size)
+            return FeedService.get_recommend_feed(sort, page, size, current_user_id)
         elif tab == 'topic':
             # 话题页面 - 只显示话题
             query = Topic.query.filter_by(status=1)
@@ -61,7 +91,14 @@ class FeedService:
                 
         if query:
             pagination = query.paginate(page=page, per_page=size, error_out=False)
-            return FeedService._format_page(pagination, item_type)
+            result = FeedService._format_page(pagination, item_type)
+            
+            # 为话题添加关注状态
+            if current_user_id and item_type == 'topic':
+                result['list'] = FeedService._add_follow_status(result['list'], current_user_id)
+                print(f"DEBUG: 已为 {len(result['list'])} 个话题添加关注状态")  # 调试信息
+            
+            return result
         
         return {
             "list": [],
@@ -74,7 +111,43 @@ class FeedService:
         }
     
     @staticmethod
-    def get_recommend_feed(sort, page, size):
+    def _add_follow_status(items, user_id):
+        """
+        为话题列表添加用户关注状态
+        """
+        if not user_id or not items:
+            return items
+        
+        # 提取话题ID
+        topic_ids = []
+        for item in items:
+            if item.get('type') == 'topic':
+                topic_ids.append(item['id'])
+        
+        if not topic_ids:
+            return items
+        
+        print(f"DEBUG: 检查用户 {user_id} 对话题 {topic_ids} 的关注状态")  # 调试信息
+        
+        # 查询用户关注的话题
+        follows = FeedFollow.query.filter_by(
+            user_id=user_id,
+            status=1
+        ).filter(FeedFollow.entity_id.in_(topic_ids)).all()
+        
+        # 创建关注ID集合
+        followed_ids = {follow.entity_id for follow in follows}
+        print(f"DEBUG: 用户已关注的话题ID: {followed_ids}")  # 调试信息
+        
+        # 为话题添加关注状态
+        for item in items:
+            if item.get('type') == 'topic':
+                item['is_followed'] = item['id'] in followed_ids
+                print(f"DEBUG: 话题 {item['id']} - {item['title']}: is_followed = {item['id'] in followed_ids}")  # 调试信息
+        
+        return items
+    @staticmethod
+    def get_recommend_feed(sort, page, size, current_user_id=None):
         """
         获取推荐内容（帖子+话题混合）
         使用综合排序算法
@@ -139,6 +212,10 @@ class FeedService:
         
         # 按推荐分数降序排序
         all_items.sort(key=lambda x: x['recommend_score'], reverse=True)
+        
+        # 为话题添加关注状态
+        if current_user_id:
+            all_items = FeedService._add_follow_status(all_items, current_user_id)
         
         # 移除推荐分数字段（前端不需要）
         for item in all_items:

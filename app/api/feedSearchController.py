@@ -18,8 +18,14 @@ def search():
     if not keyword:
         return Result.error('请输入搜索关键词')
     
+    # 获取当前用户ID
+    from app.utils.context import get_current_user_id
+    current_user_id = get_current_user_id()
+    
+    print(f"DEBUG: 搜索 - 当前用户ID: {current_user_id}, 关键词: {keyword}")  # 调试信息
+    
     # 执行搜索
-    data = FeedSearchService.search_content(keyword, filters, page, size)
+    data = FeedSearchService.search_content(keyword, filters, page, size, current_user_id)
     
     # 序列化结果
     serialized_list = FeedSchema(many=True).dump(data['list'])
