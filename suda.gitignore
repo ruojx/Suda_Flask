@@ -1,0 +1,13 @@
+# .gitignore 内容
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 数据库
+*.sqlite3
+*.db
+instance/
+
+# 虚拟环境 (如果你的环境在项目里)
+venv/
+.env
