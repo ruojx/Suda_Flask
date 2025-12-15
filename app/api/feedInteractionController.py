@@ -91,6 +91,34 @@ def delete_comment(comment_id):
     if not user_id:
         return Result.error('请先登录')
     
+    # 获取评论信息
+    from app.models.feedModels import FeedComment, Post
+    comment = FeedComment.query.get(comment_id)
+    
+    if not comment:
+        return Result.error('评论不存在')
+    
+    # 获取帖子信息
+    post = None
+    if comment.entity_type == 1:  # 帖子
+        post = Post.query.get(comment.entity_id)
+    
+    # 检查权限：评论作者或帖子作者可以删除
+    if comment.user_id != user_id and (post and post.user_id != user_id):
+        return Result.error('无权删除此评论')
+    
+    result = InteractionService.delete_comment(comment_id, user_id)
+    
+    if result["success"]:
+        return Result.success(result["message"])
+    else:
+        return Result.error(result["message"])
+    # 从token获取用户ID
+    user_id = get_current_user_id()
+    
+    if not user_id:
+        return Result.error('请先登录')
+    
     result = InteractionService.delete_comment(comment_id, user_id)
     
     if result["success"]:
