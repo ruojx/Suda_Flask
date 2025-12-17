@@ -29,3 +29,13 @@ class InteractionRequestSchema(Schema):
     user_id = fields.Int(data_key="userId", required=True)
     entity_id = fields.Int(data_key="entityId", required=True)
     entity_type = fields.Int(data_key="entityType")
+
+class UserUpdateRequestSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
+    
+    name = fields.Str()
+    avatar = fields.Str()
+    introduction = fields.Str()
+    phone = fields.Str()
+    email = fields.Str()
