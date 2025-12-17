@@ -83,7 +83,7 @@ def create_topic():
 
 @feed_bp.route('/post/<int:post_id>', methods=['GET'])
 def get_post_detail(post_id):
-    from app.models.feedModels import Post, FeedView
+    from app.models.feedModels import Post, FeedView, FeedLike, FeedCollect
     from app.extensions import db
     from flask import request
     
@@ -112,10 +112,11 @@ def get_post_detail(post_id):
     post_data = {c.name: getattr(post, c.name) for c in post.__table__.columns}
     post_data['type'] = 'post'
     
-    # 获取用户的互动状态（如果需要）
+    # 获取用户的互动状态
     user_id = get_current_user_id()
+    
+    # 使用 camelCase 字段名，这是前端期待的格式
     if user_id:
-        from app.models.feedModels import FeedLike, FeedCollect
         # 点赞状态
         like_record = FeedLike.query.filter_by(
             user_id=user_id,
@@ -123,7 +124,7 @@ def get_post_detail(post_id):
             entity_id=post_id,
             status=1
         ).first()
-        post_data['is_liked'] = like_record is not None
+        post_data['isLiked'] = like_record is not None
         
         # 收藏状态
         collect_record = FeedCollect.query.filter_by(
@@ -131,15 +132,39 @@ def get_post_detail(post_id):
             entity_id=post_id,
             status=1
         ).first()
-        post_data['is_collected'] = collect_record is not None
+        post_data['isCollected'] = collect_record is not None
+    else:
+        # 未登录用户
+        post_data['isLiked'] = False
+        post_data['isCollected'] = False
     
-    serialized_post = FeedSchema().dump(post_data)
+    # 转换字段名格式（确保字段名符合前端期望）
+    # 将数据库的snake_case转换为camelCase
+    field_mapping = {
+        'user_id': 'userId',
+        'author_name': 'authorName',
+        'view_count': 'viewCount',
+        'like_count': 'likeCount',
+        'comment_count': 'commentCount',
+        'collect_count': 'collectCount',
+        'create_time': 'createTime',
+        'update_time': 'updateTime'
+    }
     
-    return Result.success(serialized_post)
+    formatted_data = {}
+    for key, value in post_data.items():
+        if key in field_mapping:
+            formatted_data[field_mapping[key]] = value
+        else:
+            formatted_data[key] = value
+    
+    print(f"DEBUG: 帖子详情返回数据: {formatted_data}")
+    
+    return Result.success(formatted_data)
 
 @feed_bp.route('/topic/<int:topic_id>', methods=['GET'])
 def get_topic_detail(topic_id):
-    from app.models.feedModels import Topic, FeedView
+    from app.models.feedModels import Topic, FeedView, FeedLike, FeedFollow
     from app.extensions import db
     from flask import request
     
@@ -168,10 +193,11 @@ def get_topic_detail(topic_id):
     topic_data = {c.name: getattr(topic, c.name) for c in topic.__table__.columns}
     topic_data['type'] = 'topic'
     
-    # 获取用户的互动状态（如果需要）
+    # 获取用户的互动状态
     user_id = get_current_user_id()
+    
+    # 使用 camelCase 字段名
     if user_id:
-        from app.models.feedModels import FeedLike, FeedFollow
         # 点赞状态
         like_record = FeedLike.query.filter_by(
             user_id=user_id,
@@ -179,7 +205,7 @@ def get_topic_detail(topic_id):
             entity_id=topic_id,
             status=1
         ).first()
-        topic_data['is_liked'] = like_record is not None
+        topic_data['isLiked'] = like_record is not None
         
         # 关注状态
         follow_record = FeedFollow.query.filter_by(
@@ -187,43 +213,34 @@ def get_topic_detail(topic_id):
             entity_id=topic_id,
             status=1
         ).first()
-        topic_data['is_followed'] = follow_record is not None
+        topic_data['isFollowed'] = follow_record is not None
+    else:
+        # 未登录用户
+        topic_data['isLiked'] = False
+        topic_data['isFollowed'] = False
     
-    serialized_topic = FeedSchema().dump(topic_data)
+    # 转换字段名格式
+    field_mapping = {
+        'user_id': 'userId',
+        'author_name': 'authorName',
+        'view_count': 'viewCount',
+        'like_count': 'likeCount',
+        'follow_count': 'followCount',
+        'post_count': 'postCount',
+        'create_time': 'createTime',
+        'update_time': 'updateTime'
+    }
     
-    return Result.success(serialized_topic)
-
-@feed_bp.route('/post/<int:post_id>', methods=['PUT'])
-def update_post(post_id):
-    from app.models.feedModels import Post
-    from app.extensions import db
+    formatted_data = {}
+    for key, value in topic_data.items():
+        if key in field_mapping:
+            formatted_data[field_mapping[key]] = value
+        else:
+            formatted_data[key] = value
     
-    post = Post.query.get(post_id)
+    print(f"DEBUG: 话题详情返回数据: {formatted_data}")
     
-    if not post:
-        return Result.error('帖子不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or post.user_id != user_id:
-        return Result.error('无权修改此帖子')
-    
-    data = request.get_json()
-    
-    # 更新字段
-    if 'title' in data:
-        post.title = data['title']
-    if 'content' in data:
-        post.content = data['content']
-    if 'summary' in data:
-        post.summary = data['summary']
-    if 'tags' in data:
-        post.tags = data['tags']
-    
-    post.update_time = datetime.now()
-    db.session.commit()
-    
-    return Result.success("更新成功")
+    return Result.success(formatted_data)
 
 @feed_bp.route('/topic/<int:topic_id>', methods=['PUT'])
 def update_topic(topic_id):
