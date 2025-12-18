@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from app.services.feedService import FeedService
+from app.services.feedDetailService import FeedDetailService
 from app.utils.result import Result
 from app.utils.context import get_current_user_id
 from app.schemas.requests import PostRequestSchema, TopicRequestSchema
@@ -342,7 +343,7 @@ def get_topic_posts(topic_id):
         sort = request.args.get('sort', 'time')
         
         # 调用服务获取数据
-        result = FeedService.get_topic_posts(topic_id, page, size, sort)
+        result = FeedDetailService.get_topic_posts(topic_id, page, size, sort)
         
         if result["success"]:
             return Result.success(result["data"])
@@ -358,7 +359,7 @@ def get_post_comments(post_id):
     获取帖子的评论列表（分页版本）
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
+        
         
         # 获取分页参数
         page = int(request.args.get('page', 1))
@@ -381,7 +382,7 @@ def get_interaction_status():
     获取用户的互动状态
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
+        
         
         # 获取参数
         entity_type = int(request.args.get('entity_type', 0))
@@ -410,7 +411,7 @@ def get_related_posts(post_id):
     获取相关帖子
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
+        
         
         # 获取数量参数
         limit = int(request.args.get('limit', 5))
