@@ -286,10 +286,19 @@ class FeedService:
         """
         try:
             # 提取话题ID
-            topic_id = data.get('topicId')
+            topic_id = data.get('topic_id')
             
             # 创建帖子
-            post = Post(**data, status=1, topic_id=topic_id)
+            post = Post(
+                user_id=data.get('user_id'),
+                author_name=data.get('author_name'),
+                title=data.get('title'),
+                content=data.get('content'),
+                summary=data.get('summary'),
+                tags=data.get('tags'),
+                topic_id=topic_id,
+                status=1
+            )
             db.session.add(post)
             db.session.commit()
             
@@ -300,12 +309,14 @@ class FeedService:
                     topic.post_count = (topic.post_count or 0) + 1
                     db.session.commit()
             
+            print(f"DEBUG: 创建帖子成功，ID: {post.id}, 话题ID: {topic_id}")
             return post.id
             
         except Exception as e:
             db.session.rollback()
+            print(f"ERROR: 创建帖子失败: {str(e)}")
             raise e
-        
+   
     @staticmethod
     def create_topic(data):
         topic = Topic(**data, status=1)

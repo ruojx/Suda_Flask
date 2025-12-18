@@ -220,7 +220,7 @@ class FeedDetailService:
     @staticmethod
     def get_post_comments(post_id, page=1, size=20):
         """
-        获取帖子的评论列表
+        获取帖子的评论列表（分页版本）
         """
         try:
             # 检查帖子是否存在
@@ -243,16 +243,15 @@ class FeedDetailService:
             for comment in pagination.items:
                 comment_data = {
                     "id": comment.id,
-                    "user_id": comment.user_id,
+                    "userId": comment.user_id,
                     "content": comment.content,
-                    "like_count": comment.like_count,
-                    "create_time": comment.create_time.strftime('%Y-%m-%d %H:%M:%S') if comment.create_time else None
+                    "likeCount": comment.like_count,
+                    "createTime": comment.create_time.strftime('%Y-%m-%d %H:%M:%S') if comment.create_time else None
                 }
                 
-                # 获取用户信息（这里需要您已有的用户服务）
-                # 可以调用已有的用户服务获取用户名等
+                # 如果需要，可以在这里获取用户信息
                 # user_info = UserService.get_user_info(comment.user_id)
-                # comment_data['user_name'] = user_info.get('name', '匿名用户')
+                # comment_data['userName'] = user_info.get('name', '匿名用户')
                 
                 comments.append(comment_data)
             
@@ -270,8 +269,10 @@ class FeedDetailService:
             }
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {"success": False, "message": f"获取评论失败: {str(e)}"}
-    
+
     @staticmethod
     def get_user_interaction_status(user_id, entity_type, entity_id):
         """

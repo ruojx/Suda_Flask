@@ -68,26 +68,53 @@ def get_user_follows():
     data['list'] = serialized_list
     
     return Result.success(data)
+
 @feed_bp.route('/post', methods=['POST'])
 def create_post():
     """
     创建帖子（支持关联话题）
     """
     try:
-        data = PostRequestSchema().load(request.get_json())
+        data = request.get_json()
         
-        # 如果有话题ID，验证话题是否存在
+        # 确保必需字段存在
+        required_fields = ['title', 'content', 'userId']
+        for field in required_fields:
+            if field not in data:
+                return Result.error(f'缺少必需字段: {field}')
+        
+        # 验证用户是否存在
+        user_id = data.get('userId')
+        author_name = data.get('authorName', f'用户{user_id}')
+        
+        # 提取话题ID
         topic_id = data.get('topicId')
         if topic_id:
+            # 验证话题是否存在
             from app.models.feedModels import Topic
             topic = Topic.query.filter_by(id=topic_id, status=1).first()
             if not topic:
                 return Result.error('关联的话题不存在')
         
-        pid = FeedService.create_post(data)
+        # 准备帖子数据
+        post_data = {
+            'user_id': user_id,
+            'author_name': author_name,
+            'title': data.get('title', ''),
+            'content': data.get('content', ''),
+            'summary': data.get('summary', data.get('title', '')),
+            'tags': data.get('tags', ''),
+            'topic_id': topic_id
+        }
+        
+        # 创建帖子
+        from app.services.feedService import FeedService
+        pid = FeedService.create_post(post_data)
         return Result.success({"id": pid})
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return Result.error(f"创建失败: {str(e)}")
 
 @feed_bp.route('/topic', methods=['POST'])
@@ -150,6 +177,7 @@ def get_post_detail(post_id):
             status=1
         ).first()
         post_data['isCollected'] = collect_record is not None
+        print(f"DEBUG: 互动状态 - 已点赞: {post_data['isLiked']}, 已收藏: {post_data['isCollected']}")
     else:
         # 未登录用户
         post_data['isLiked'] = False
@@ -175,7 +203,7 @@ def get_post_detail(post_id):
         else:
             formatted_data[key] = value
     
-    print(f"DEBUG: 帖子详情返回数据: {formatted_data}")
+    print(f"DEBUG: 帖子详情返回数据 - 作者ID: {post_data.get('userId')}, 话题ID: {post_data.get('topicId')}")
     
     return Result.success(formatted_data)
 

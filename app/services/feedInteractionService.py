@@ -149,39 +149,64 @@ class InteractionService:
         
         db.session.commit()
         return comment
-    
+
+    # 修改 get_comments 方法
     @staticmethod
     def get_comments(entity_type, entity_id):
+        """
+        获取评论列表
+        """
         comments = FeedComment.query.filter_by(
             entity_type=entity_type,
             entity_id=entity_id,
             status=1
         ).order_by(FeedComment.create_time.desc()).all()
         
-        return comments
-    
+        # 格式化评论数据
+        comment_list = []
+        for comment in comments:
+            comment_data = {
+                "id": comment.id,
+                "userId": comment.user_id,
+                "user_id": comment.user_id,  # 同时保留两种格式
+                "content": comment.content,
+                "likeCount": comment.like_count,
+                "createTime": comment.create_time.strftime('%Y-%m-%d %H:%M:%S') if comment.create_time else None
+            }
+            comment_list.append(comment_data)
+        return comment_list  # 现在返回的是字典列表，而不是对象列表
+
     @staticmethod
     def delete_comment(comment_id, user_id):
-        comment = FeedComment.query.get(comment_id)
-        
-        if not comment:
-            return {"success": False, "message": "评论不存在"}
-        
-        # 检查权限
-        if comment.user_id != user_id:
-            return {"success": False, "message": "无权删除此评论"}
-        
-        # 软删除
-        comment.status = 0
-        
-        # 更新评论计数
-        if comment.entity_type == 1:  # 帖子
-            post = Post.query.get(comment.entity_id)
-            if post:
-                post.comment_count = max(0, (post.comment_count or 0) - 1)
-        
-        db.session.commit()
-        return {"success": True, "message": "删除成功"}
+        """
+        删除评论
+        """
+        try:
+            comment = FeedComment.query.get(comment_id)
+            
+            if not comment:
+                return {"success": False, "message": "评论不存在"}
+            
+            print(f"DEBUG: 删除评论服务 - 评论ID: {comment_id}, 用户ID: {user_id}")
+            print(f"DEBUG: 评论数据 - 作者ID: {comment.user_id}, 实体类型: {comment.entity_type}, 实体ID: {comment.entity_id}")
+            
+            # 软删除
+            comment.status = 0
+            
+            # 更新评论计数
+            if comment.entity_type == 1:  # 帖子
+                post = Post.query.get(comment.entity_id)
+                if post:
+                    post.comment_count = max(0, (post.comment_count or 0) - 1)
+                    print(f"DEBUG: 更新帖子评论计数 - 原计数: {post.comment_count + 1}, 新计数: {post.comment_count}")
+            
+            db.session.commit()
+            return {"success": True, "message": "删除成功"}
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERROR: 删除评论失败: {str(e)}")
+            return {"success": False, "message": f"删除失败: {str(e)}"}
 
     @staticmethod
     def toggle_comment_like(comment_id, user_id):
