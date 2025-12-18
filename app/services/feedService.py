@@ -240,10 +240,30 @@ class FeedService:
 
     @staticmethod
     def create_post(data):
-        post = Post(**data, status=1)
-        db.session.add(post)
-        db.session.commit()
-        return post.id
+        """
+        创建帖子
+        """
+        try:
+            # 提取话题ID
+            topic_id = data.get('topicId')
+            
+            # 创建帖子
+            post = Post(**data, status=1, topic_id=topic_id)
+            db.session.add(post)
+            db.session.commit()
+            
+            # 如果有关联的话题，更新话题的帖子计数
+            if topic_id:
+                topic = Topic.query.get(topic_id)
+                if topic:
+                    topic.post_count = (topic.post_count or 0) + 1
+                    db.session.commit()
+            
+            return post.id
+            
+        except Exception as e:
+            db.session.rollback()
+            raise e
         
     @staticmethod
     def create_topic(data):

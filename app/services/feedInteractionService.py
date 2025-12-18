@@ -182,3 +182,51 @@ class InteractionService:
         
         db.session.commit()
         return {"success": True, "message": "删除成功"}
+
+    @staticmethod
+    def toggle_comment_like(comment_id, user_id):
+        """
+        点赞/取消点赞评论
+        """
+        try:
+            # 查找现有记录
+            record = FeedLike.query.filter_by(
+                user_id=user_id,
+                entity_type=3,  # 3表示评论
+                entity_id=comment_id
+            ).first()
+            
+            delta = 0
+            if record:
+                # 切换点赞状态
+                if record.status == 1:
+                    # 取消点赞
+                    record.status = 0
+                    delta = -1
+                else:
+                    # 重新点赞
+                    record.status = 1
+                    delta = 1
+            else:
+                # 创建新的点赞记录
+                db.session.add(FeedLike(
+                    user_id=user_id,
+                    entity_type=3,
+                    entity_id=comment_id,
+                    status=1
+                ))
+                delta = 1
+            
+            # 更新评论点赞计数
+            if delta != 0:
+                comment = FeedComment.query.get(comment_id)
+                if comment:
+                    comment.like_count = max(0, (comment.like_count or 0) + delta)
+            
+            db.session.commit()
+            return {"success": True, "message": "操作成功"}
+            
+        except Exception as e:
+            db.session.rollback()
+            return {"success": False, "message": f"操作失败: {str(e)}"}
+

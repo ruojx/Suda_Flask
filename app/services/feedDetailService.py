@@ -119,7 +119,7 @@ class FeedDetailService:
     @staticmethod
     def get_topic_posts(topic_id, page=1, size=10, sort='time'):
         """
-        获取话题下的帖子列表
+        获取话题下的帖子列表（返回格式化数据）
         """
         try:
             # 检查话题是否存在
@@ -139,11 +139,25 @@ class FeedDetailService:
             # 分页
             pagination = query.paginate(page=page, per_page=size, error_out=False)
             
-            # 格式化结果
+            # 格式化帖子数据
             posts = []
             for post in pagination.items:
-                post_data = {c.name: getattr(post, c.name) for c in post.__table__.columns}
-                post_data['type'] = 'post'
+                post_data = {
+                    "id": post.id,
+                    "type": "post",
+                    "title": post.title,
+                    "summary": post.summary,
+                    "authorName": post.author_name,
+                    "userId": post.user_id,
+                    "viewCount": post.view_count or 0,
+                    "likeCount": post.like_count or 0,
+                    "commentCount": post.comment_count or 0,
+                    "collectCount": post.collect_count or 0,
+                    "tags": post.tags,
+                    "createTime": post.create_time.strftime('%Y-%m-%d %H:%M:%S') if post.create_time else None,
+                    "updateTime": post.update_time.strftime('%Y-%m-%d %H:%M:%S') if post.update_time else None,
+                    "topicId": post.topic_id
+                }
                 posts.append(post_data)
             
             return {
@@ -161,7 +175,7 @@ class FeedDetailService:
             
         except Exception as e:
             return {"success": False, "message": f"获取话题帖子失败: {str(e)}"}
-    
+
     @staticmethod
     def get_post_comments(post_id, page=1, size=20):
         """

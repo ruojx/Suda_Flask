@@ -69,9 +69,25 @@ def get_user_follows():
     return Result.success(data)
 @feed_bp.route('/post', methods=['POST'])
 def create_post():
-    data = PostRequestSchema().load(request.get_json())
-    pid = FeedService.create_post(data)
-    return Result.success({"id": pid})
+    """
+    创建帖子（支持关联话题）
+    """
+    try:
+        data = PostRequestSchema().load(request.get_json())
+        
+        # 如果有话题ID，验证话题是否存在
+        topic_id = data.get('topicId')
+        if topic_id:
+            from app.models.feedModels import Topic
+            topic = Topic.query.filter_by(id=topic_id, status=1).first()
+            if not topic:
+                return Result.error('关联的话题不存在')
+        
+        pid = FeedService.create_post(data)
+        return Result.success({"id": pid})
+        
+    except Exception as e:
+        return Result.error(f"创建失败: {str(e)}")
 
 @feed_bp.route('/topic', methods=['POST'])
 def create_topic():
@@ -314,22 +330,19 @@ def delete_topic(topic_id):
     return Result.success("删除成功")
 
 # 添加在feedController.py中的合适位置
-
 @feed_bp.route('/topic/<int:topic_id>/posts', methods=['GET'])
 def get_topic_posts(topic_id):
     """
     获取话题下的帖子列表
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
-        
         # 获取分页参数
         page = int(request.args.get('page', 1))
         size = int(request.args.get('size', 10))
-        sort = request.args.get('sort', 'time')  # time 或 hot
+        sort = request.args.get('sort', 'time')
         
-        # 获取帖子列表
-        result = FeedDetailService.get_topic_posts(topic_id, page, size, sort)
+        # 调用服务获取数据
+        result = FeedService.get_topic_posts(topic_id, page, size, sort)
         
         if result["success"]:
             return Result.success(result["data"])
