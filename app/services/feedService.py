@@ -323,3 +323,127 @@ class FeedService:
         db.session.add(topic)
         db.session.commit()
         return topic.id
+
+    @staticmethod
+    def delete_post_with_cascade(post_id, user_id):
+        """
+        删除帖子（级联删除相关数据）
+        """
+        try:
+            from app.models.feedModels import Post, FeedLike, FeedCollect, FeedComment, FeedView
+            from app.extensions import db
+            
+            # 查找帖子
+            post = Post.query.get(post_id)
+            
+            if not post:
+                return {"success": False, "message": "帖子不存在"}
+            
+            # 检查权限
+            if post.user_id != user_id:
+                return {"success": False, "message": "无权删除此帖子"}
+            
+            print(f"DEBUG: 开始删除帖子 {post_id} 及相关数据")
+            
+            # 1. 删除帖子相关的点赞记录
+            like_count = FeedLike.query.filter_by(
+                entity_type=1,  # 帖子
+                entity_id=post_id
+            ).delete()
+            print(f"DEBUG: 删除点赞记录: {like_count} 条")
+            
+            # 2. 删除帖子相关的收藏记录
+            collect_count = FeedCollect.query.filter_by(
+                entity_id=post_id
+            ).delete()
+            print(f"DEBUG: 删除收藏记录: {collect_count} 条")
+            
+            # 3. 删除帖子相关的评论记录
+            comment_count = FeedComment.query.filter_by(
+                entity_type=1,  # 帖子
+                entity_id=post_id
+            ).delete()
+            print(f"DEBUG: 删除评论记录: {comment_count} 条")
+            
+            # 4. 删除帖子相关的浏览记录
+            view_count = FeedView.query.filter_by(
+                entity_type=1,  # 帖子
+                entity_id=post_id
+            ).delete()
+            print(f"DEBUG: 删除浏览记录: {view_count} 条")
+            
+            # 5. 软删除帖子本身
+            post.status = 0
+            
+            db.session.commit()
+            return {"success": True, "message": "帖子删除成功"}
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERROR: 删除帖子失败: {str(e)}")
+            return {"success": False, "message": f"删除失败: {str(e)}"}
+    
+    @staticmethod
+    def delete_topic_with_cascade(topic_id, user_id):
+        """
+        删除话题（级联删除相关数据）
+        """
+        try:
+            from app.models.feedModels import Topic, FeedLike, FeedFollow, FeedComment, FeedView, Post
+            from app.extensions import db
+            
+            # 查找话题
+            topic = Topic.query.get(topic_id)
+            
+            if not topic:
+                return {"success": False, "message": "话题不存在"}
+            
+            # 检查权限
+            if topic.user_id != user_id:
+                return {"success": False, "message": "无权删除此话题"}
+            
+            print(f"DEBUG: 开始删除话题 {topic_id} 及相关数据")
+            
+            # 1. 删除话题相关的点赞记录
+            like_count = FeedLike.query.filter_by(
+                entity_type=2,  # 话题
+                entity_id=topic_id
+            ).delete()
+            print(f"DEBUG: 删除话题点赞记录: {like_count} 条")
+            
+            # 2. 删除话题相关的关注记录
+            follow_count = FeedFollow.query.filter_by(
+                entity_id=topic_id
+            ).delete()
+            print(f"DEBUG: 删除关注记录: {follow_count} 条")
+            
+            # 3. 删除话题相关的评论记录
+            comment_count = FeedComment.query.filter_by(
+                entity_type=2,  # 话题
+                entity_id=topic_id
+            ).delete()
+            print(f"DEBUG: 删除话题评论记录: {comment_count} 条")
+            
+            # 4. 删除话题相关的浏览记录
+            view_count = FeedView.query.filter_by(
+                entity_type=2,  # 话题
+                entity_id=topic_id
+            ).delete()
+            print(f"DEBUG: 删除话题浏览记录: {view_count} 条")
+            
+            # 5. 更新该话题下所有帖子，将topic_id设为NULL
+            post_count = Post.query.filter_by(topic_id=topic_id).update(
+                {Post.topic_id: None}
+            )
+            print(f"DEBUG: 更新帖子话题关联: {post_count} 条")
+            
+            # 6. 软删除话题本身
+            topic.status = 0
+            
+            db.session.commit()
+            return {"success": True, "message": "话题删除成功"}
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"ERROR: 删除话题失败: {str(e)}")
+            return {"success": False, "message": f"删除失败: {str(e)}"}

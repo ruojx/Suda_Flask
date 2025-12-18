@@ -287,76 +287,165 @@ def get_topic_detail(topic_id):
     
     return Result.success(formatted_data)
 
-@feed_bp.route('/topic/<int:topic_id>', methods=['PUT'])
-def update_topic(topic_id):
-    from app.models.feedModels import Topic
-    from app.extensions import db
-    from datetime import datetime
-    
-    topic = Topic.query.get(topic_id)
-    
-    if not topic:
-        return Result.error('话题不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or topic.user_id != user_id:
-        return Result.error('无权修改此话题')
-    
-    data = request.get_json()
-    
-    # 更新字段
-    if 'title' in data:
-        topic.title = data['title']
-    if 'summary' in data:
-        topic.summary = data['summary']
-    
-    topic.update_time = datetime.now()
-    db.session.commit()
-    
-    return Result.success("更新成功")
+@feed_bp.route('/post/<int:post_id>', methods=['PUT'])
+def update_post(post_id):
+    """
+    更新帖子
+    """
+    try:
+        from app.models.feedModels import Post
+        from app.extensions import db
+        from datetime import datetime
+        
+        post = Post.query.get(post_id)
+        
+        if not post:
+            return Result.error('帖子不存在')
+        
+        # 检查权限
+        user_id = get_current_user_id()
+        if not user_id or post.user_id != user_id:
+            return Result.error('无权修改此帖子')
+        
+        data = request.get_json()
+        
+        # 验证必要字段
+        if not data:
+            return Result.error('请求数据为空')
+        
+        # 更新字段
+        update_fields = []
+        
+        if 'title' in data:
+            post.title = data['title'].strip()
+            update_fields.append('标题')
+        
+        if 'content' in data:
+            post.content = data['content'].strip()
+            update_fields.append('内容')
+        
+        if 'summary' in data:
+            post.summary = data['summary'].strip()
+            update_fields.append('摘要')
+        
+        if 'tags' in data:
+            post.tags = data['tags'].strip()
+            update_fields.append('标签')
+        
+        # 如果有更新，更新修改时间
+        if update_fields:
+            post.update_time = datetime.now()
+            db.session.commit()
+            print(f"DEBUG: 帖子 {post_id} 已更新字段: {', '.join(update_fields)}")
+            return Result.success("更新成功")
+        else:
+            return Result.error('没有需要更新的字段')
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"更新失败: {str(e)}")
 
 @feed_bp.route('/post/<int:post_id>', methods=['DELETE'])
 def delete_post(post_id):
-    from app.models.feedModels import Post
-    from app.extensions import db
-    
-    post = Post.query.get(post_id)
-    
-    if not post:
-        return Result.error('帖子不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or post.user_id != user_id:
-        return Result.error('无权删除此帖子')
-    
-    # 软删除
-    post.status = 0
-    db.session.commit()
-    
-    return Result.success("删除成功")
+    """
+    删除帖子（级联删除相关数据）
+    """
+    try:
+        user_id = get_current_user_id()
+        
+        if not user_id:
+            return Result.error('请先登录')
+        
+        # 调用服务进行级联删除
+        from app.services.feedService import FeedService
+        result = FeedService.delete_post_with_cascade(post_id, user_id)
+        
+        if result["success"]:
+            return Result.success(result["message"])
+        else:
+            return Result.error(result["message"])
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"删除失败: {str(e)}")
+
+@feed_bp.route('/topic/<int:topic_id>', methods=['PUT'])
+def update_topic(topic_id):
+    """
+    更新话题
+    """
+    try:
+        from app.models.feedModels import Topic
+        from app.extensions import db
+        from datetime import datetime
+        
+        topic = Topic.query.get(topic_id)
+        
+        if not topic:
+            return Result.error('话题不存在')
+        
+        # 检查权限
+        user_id = get_current_user_id()
+        if not user_id or topic.user_id != user_id:
+            return Result.error('无权修改此话题')
+        
+        data = request.get_json()
+        
+        # 验证必要字段
+        if not data:
+            return Result.error('请求数据为空')
+        
+        # 更新字段
+        update_fields = []
+        
+        if 'title' in data:
+            topic.title = data['title'].strip()
+            update_fields.append('标题')
+        
+        if 'summary' in data:
+            topic.summary = data['summary'].strip()
+            update_fields.append('描述')
+        
+        # 如果有更新，更新修改时间
+        if update_fields:
+            topic.update_time = datetime.now()
+            db.session.commit()
+            print(f"DEBUG: 话题 {topic_id} 已更新字段: {', '.join(update_fields)}")
+            return Result.success("更新成功")
+        else:
+            return Result.error('没有需要更新的字段')
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"更新失败: {str(e)}")
 
 @feed_bp.route('/topic/<int:topic_id>', methods=['DELETE'])
 def delete_topic(topic_id):
-    from app.models.feedModels import Topic
-    from app.extensions import db
-    
-    topic = Topic.query.get(topic_id)
-    
-    if not topic:
-        return Result.error('话题不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or topic.user_id != user_id:
-        return Result.error('无权删除此话题')
-    
-    # 软删除
-    topic.status = 0
-    db.session.commit()
-    
-    return Result.success("删除成功")
+    """
+    删除话题（级联删除相关数据）
+    """
+    try:
+        user_id = get_current_user_id()
+        
+        if not user_id:
+            return Result.error('请先登录')
+        
+        # 调用服务进行级联删除
+        from app.services.feedService import FeedService
+        result = FeedService.delete_topic_with_cascade(topic_id, user_id)
+        
+        if result["success"]:
+            return Result.success(result["message"])
+        else:
+            return Result.error(result["message"])
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"删除失败: {str(e)}")
 
 # 添加在feedController.py中的合适位置
 @feed_bp.route('/topic/<int:topic_id>/posts', methods=['GET'])
