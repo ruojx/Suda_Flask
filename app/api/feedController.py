@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from app.services.feedService import FeedService
+from app.services.feedDetailService import FeedDetailService
 from app.utils.result import Result
 from app.utils.context import get_current_user_id
 from app.schemas.requests import PostRequestSchema, TopicRequestSchema
@@ -67,11 +68,54 @@ def get_user_follows():
     data['list'] = serialized_list
     
     return Result.success(data)
+
 @feed_bp.route('/post', methods=['POST'])
 def create_post():
-    data = PostRequestSchema().load(request.get_json())
-    pid = FeedService.create_post(data)
-    return Result.success({"id": pid})
+    """
+    创建帖子（支持关联话题）
+    """
+    try:
+        data = request.get_json()
+        
+        # 确保必需字段存在
+        required_fields = ['title', 'content', 'userId']
+        for field in required_fields:
+            if field not in data:
+                return Result.error(f'缺少必需字段: {field}')
+        
+        # 验证用户是否存在
+        user_id = data.get('userId')
+        author_name = data.get('authorName', f'用户{user_id}')
+        
+        # 提取话题ID
+        topic_id = data.get('topicId')
+        if topic_id:
+            # 验证话题是否存在
+            from app.models.feedModels import Topic
+            topic = Topic.query.filter_by(id=topic_id, status=1).first()
+            if not topic:
+                return Result.error('关联的话题不存在')
+        
+        # 准备帖子数据
+        post_data = {
+            'user_id': user_id,
+            'author_name': author_name,
+            'title': data.get('title', ''),
+            'content': data.get('content', ''),
+            'summary': data.get('summary', data.get('title', '')),
+            'tags': data.get('tags', ''),
+            'topic_id': topic_id
+        }
+        
+        # 创建帖子
+        from app.services.feedService import FeedService
+        pid = FeedService.create_post(post_data)
+        return Result.success({"id": pid})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"创建失败: {str(e)}")
 
 @feed_bp.route('/topic', methods=['POST'])
 def create_topic():
@@ -133,6 +177,7 @@ def get_post_detail(post_id):
             status=1
         ).first()
         post_data['isCollected'] = collect_record is not None
+        print(f"DEBUG: 互动状态 - 已点赞: {post_data['isLiked']}, 已收藏: {post_data['isCollected']}")
     else:
         # 未登录用户
         post_data['isLiked'] = False
@@ -158,7 +203,7 @@ def get_post_detail(post_id):
         else:
             formatted_data[key] = value
     
-    print(f"DEBUG: 帖子详情返回数据: {formatted_data}")
+    print(f"DEBUG: 帖子详情返回数据 - 作者ID: {post_data.get('userId')}, 话题ID: {post_data.get('topicId')}")
     
     return Result.success(formatted_data)
 
@@ -314,21 +359,18 @@ def delete_topic(topic_id):
     return Result.success("删除成功")
 
 # 添加在feedController.py中的合适位置
-
 @feed_bp.route('/topic/<int:topic_id>/posts', methods=['GET'])
 def get_topic_posts(topic_id):
     """
     获取话题下的帖子列表
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
-        
         # 获取分页参数
         page = int(request.args.get('page', 1))
         size = int(request.args.get('size', 10))
-        sort = request.args.get('sort', 'time')  # time 或 hot
+        sort = request.args.get('sort', 'time')
         
-        # 获取帖子列表
+        # 调用服务获取数据
         result = FeedDetailService.get_topic_posts(topic_id, page, size, sort)
         
         if result["success"]:
@@ -345,7 +387,7 @@ def get_post_comments(post_id):
     获取帖子的评论列表（分页版本）
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
+        
         
         # 获取分页参数
         page = int(request.args.get('page', 1))
@@ -368,7 +410,7 @@ def get_interaction_status():
     获取用户的互动状态
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
+        
         
         # 获取参数
         entity_type = int(request.args.get('entity_type', 0))
@@ -397,7 +439,7 @@ def get_related_posts(post_id):
     获取相关帖子
     """
     try:
-        from app.services.feedDetailService import FeedDetailService
+        
         
         # 获取数量参数
         limit = int(request.args.get('limit', 5))
