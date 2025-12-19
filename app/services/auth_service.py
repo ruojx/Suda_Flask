@@ -3,6 +3,10 @@ from app.utils.jwt_utils import parse_token
 from app.models.user import User
 from app.utils.jwt_utils import create_token
 from app.extensions import db
+# app/services/auth_service.py
+from app.models.user import User
+from app.extensions import db
+from app.utils.jwt_utils import create_token
 
 # 白名单路径
 WHITELIST = [
@@ -49,3 +53,48 @@ class AuthService:
             "id": user.id, "username": user.username, "name": user.name,
             "phone": user.phone, "avatar": user.avatar, "token": token
         }
+    
+    @staticmethod
+    def reset(data):
+        """
+        对应 Java PublicServiceImpl.reset
+        逻辑：如果没传手机号，就认为是“修改密码”（验证旧密码）；
+              如果传了手机号，就认为是“重置密码”（验证身份）。
+        """
+        new_pwd = data.get('new_password')
+        phone = data.get('phone')
+        
+        user = None
+        
+        # 1. 模式一：通过手机号找回 (Forgot Password)
+        if phone:
+            # 对应 updatePasswordByIdentifier
+            identifier = data.get('identifier') # 用户名
+            user = User.query.filter_by(username=identifier, phone=phone).first()
+            if not user:
+                return 0 # 用户不存在或手机号不匹配
+                
+            user.password = new_pwd
+            db.session.commit()
+            return 1
+            
+        # 2. 模式二：通过旧密码修改 (Change Password)
+        else:
+            # 对应 updatePassword
+            # 必须校验 old_password 和 id
+            uid = data.get('id')
+            old_pwd = data.get('old_password')
+            
+            if not uid or not old_pwd:
+                raise Exception("参数缺失：ID或旧密码为空")
+                
+            user = User.query.get(uid)
+            if not user:
+                return 0
+            
+            if user.password != old_pwd:
+                raise Exception("旧密码错误")
+                
+            user.password = new_pwd
+            db.session.commit()
+            return 1

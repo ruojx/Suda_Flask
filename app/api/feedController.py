@@ -1,5 +1,6 @@
 from flask import Blueprint, request
 from app.services.feedService import FeedService
+from app.services.feedDetailService import FeedDetailService
 from app.utils.result import Result
 from app.utils.context import get_current_user_id
 from app.schemas.requests import PostRequestSchema, TopicRequestSchema
@@ -67,11 +68,54 @@ def get_user_follows():
     data['list'] = serialized_list
     
     return Result.success(data)
+
 @feed_bp.route('/post', methods=['POST'])
 def create_post():
-    data = PostRequestSchema().load(request.get_json())
-    pid = FeedService.create_post(data)
-    return Result.success({"id": pid})
+    """
+    创建帖子（支持关联话题）
+    """
+    try:
+        data = request.get_json()
+        
+        # 确保必需字段存在
+        required_fields = ['title', 'content', 'userId']
+        for field in required_fields:
+            if field not in data:
+                return Result.error(f'缺少必需字段: {field}')
+        
+        # 验证用户是否存在
+        user_id = data.get('userId')
+        author_name = data.get('authorName', f'用户{user_id}')
+        
+        # 提取话题ID
+        topic_id = data.get('topicId')
+        if topic_id:
+            # 验证话题是否存在
+            from app.models.feedModels import Topic
+            topic = Topic.query.filter_by(id=topic_id, status=1).first()
+            if not topic:
+                return Result.error('关联的话题不存在')
+        
+        # 准备帖子数据
+        post_data = {
+            'user_id': user_id,
+            'author_name': author_name,
+            'title': data.get('title', ''),
+            'content': data.get('content', ''),
+            'summary': data.get('summary', data.get('title', '')),
+            'tags': data.get('tags', ''),
+            'topic_id': topic_id
+        }
+        
+        # 创建帖子
+        from app.services.feedService import FeedService
+        pid = FeedService.create_post(post_data)
+        return Result.success({"id": pid})
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"创建失败: {str(e)}")
 
 @feed_bp.route('/topic', methods=['POST'])
 def create_topic():
@@ -79,9 +123,13 @@ def create_topic():
     tid = FeedService.create_topic(data)
     return Result.success({"id": tid})
 
+# 在feedController.py中添加以下修改
+
 @feed_bp.route('/post/<int:post_id>', methods=['GET'])
 def get_post_detail(post_id):
-    from app.models.feedModels import Post
+    from app.models.feedModels import Post, FeedView, FeedLike, FeedCollect
+    from app.extensions import db
+    from flask import request
     
     post = Post.query.get(post_id)
     
@@ -92,9 +140,6 @@ def get_post_detail(post_id):
     post.view_count = (post.view_count or 0) + 1
     
     # 创建浏览记录
-    from app.models.feedModels import FeedView
-    from flask import request
-    
     view_record = FeedView(
         user_id=get_current_user_id() or 0,
         entity_type=1,
@@ -104,21 +149,69 @@ def get_post_detail(post_id):
         referer=request.headers.get('Referer', '')
     )
     
-    from app.extensions import db
     db.session.add(view_record)
     db.session.commit()
     
-    # 返回帖子详情
+    # 获取帖子详情数据
     post_data = {c.name: getattr(post, c.name) for c in post.__table__.columns}
     post_data['type'] = 'post'
     
-    serialized_post = FeedSchema().dump(post_data)
+    # 获取用户的互动状态
+    user_id = get_current_user_id()
     
-    return Result.success(serialized_post)
+    # 使用 camelCase 字段名，这是前端期待的格式
+    if user_id:
+        # 点赞状态
+        like_record = FeedLike.query.filter_by(
+            user_id=user_id,
+            entity_type=1,
+            entity_id=post_id,
+            status=1
+        ).first()
+        post_data['isLiked'] = like_record is not None
+        
+        # 收藏状态
+        collect_record = FeedCollect.query.filter_by(
+            user_id=user_id,
+            entity_id=post_id,
+            status=1
+        ).first()
+        post_data['isCollected'] = collect_record is not None
+        print(f"DEBUG: 互动状态 - 已点赞: {post_data['isLiked']}, 已收藏: {post_data['isCollected']}")
+    else:
+        # 未登录用户
+        post_data['isLiked'] = False
+        post_data['isCollected'] = False
+    
+    # 转换字段名格式（确保字段名符合前端期望）
+    # 将数据库的snake_case转换为camelCase
+    field_mapping = {
+        'user_id': 'userId',
+        'author_name': 'authorName',
+        'view_count': 'viewCount',
+        'like_count': 'likeCount',
+        'comment_count': 'commentCount',
+        'collect_count': 'collectCount',
+        'create_time': 'createTime',
+        'update_time': 'updateTime'
+    }
+    
+    formatted_data = {}
+    for key, value in post_data.items():
+        if key in field_mapping:
+            formatted_data[field_mapping[key]] = value
+        else:
+            formatted_data[key] = value
+    
+    print(f"DEBUG: 帖子详情返回数据 - 作者ID: {post_data.get('userId')}, 话题ID: {post_data.get('topicId')}")
+    
+    return Result.success(formatted_data)
 
 @feed_bp.route('/topic/<int:topic_id>', methods=['GET'])
 def get_topic_detail(topic_id):
-    from app.models.feedModels import Topic
+    from app.models.feedModels import Topic, FeedView, FeedLike, FeedFollow
+    from app.extensions import db
+    from flask import request
     
     topic = Topic.query.get(topic_id)
     
@@ -129,9 +222,6 @@ def get_topic_detail(topic_id):
     topic.view_count = (topic.view_count or 0) + 1
     
     # 创建浏览记录
-    from app.models.feedModels import FeedView
-    from flask import request
-    
     view_record = FeedView(
         user_id=get_current_user_id() or 0,
         entity_type=2,
@@ -141,117 +231,374 @@ def get_topic_detail(topic_id):
         referer=request.headers.get('Referer', '')
     )
     
-    from app.extensions import db
     db.session.add(view_record)
     db.session.commit()
     
-    # 返回话题详情
+    # 获取话题详情数据
     topic_data = {c.name: getattr(topic, c.name) for c in topic.__table__.columns}
     topic_data['type'] = 'topic'
     
-    serialized_topic = FeedSchema().dump(topic_data)
+    # 获取用户的互动状态
+    user_id = get_current_user_id()
     
-    return Result.success(serialized_topic)
+    # 使用 camelCase 字段名
+    if user_id:
+        # 点赞状态
+        like_record = FeedLike.query.filter_by(
+            user_id=user_id,
+            entity_type=2,
+            entity_id=topic_id,
+            status=1
+        ).first()
+        topic_data['isLiked'] = like_record is not None
+        
+        # 关注状态
+        follow_record = FeedFollow.query.filter_by(
+            user_id=user_id,
+            entity_id=topic_id,
+            status=1
+        ).first()
+        topic_data['isFollowed'] = follow_record is not None
+    else:
+        # 未登录用户
+        topic_data['isLiked'] = False
+        topic_data['isFollowed'] = False
+    
+    # 转换字段名格式
+    field_mapping = {
+        'user_id': 'userId',
+        'author_name': 'authorName',
+        'view_count': 'viewCount',
+        'like_count': 'likeCount',
+        'follow_count': 'followCount',
+        'post_count': 'postCount',
+        'create_time': 'createTime',
+        'update_time': 'updateTime'
+    }
+    
+    formatted_data = {}
+    for key, value in topic_data.items():
+        if key in field_mapping:
+            formatted_data[field_mapping[key]] = value
+        else:
+            formatted_data[key] = value
+    
+    print(f"DEBUG: 话题详情返回数据: {formatted_data}")
+    
+    return Result.success(formatted_data)
 
 @feed_bp.route('/post/<int:post_id>', methods=['PUT'])
 def update_post(post_id):
-    from app.models.feedModels import Post
-    from app.extensions import db
-    
-    post = Post.query.get(post_id)
-    
-    if not post:
-        return Result.error('帖子不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or post.user_id != user_id:
-        return Result.error('无权修改此帖子')
-    
-    data = request.get_json()
-    
-    # 更新字段
-    if 'title' in data:
-        post.title = data['title']
-    if 'content' in data:
-        post.content = data['content']
-    if 'summary' in data:
-        post.summary = data['summary']
-    if 'tags' in data:
-        post.tags = data['tags']
-    
-    post.update_time = datetime.now()
-    db.session.commit()
-    
-    return Result.success("更新成功")
-
-@feed_bp.route('/topic/<int:topic_id>', methods=['PUT'])
-def update_topic(topic_id):
-    from app.models.feedModels import Topic
-    from app.extensions import db
-    from datetime import datetime
-    
-    topic = Topic.query.get(topic_id)
-    
-    if not topic:
-        return Result.error('话题不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or topic.user_id != user_id:
-        return Result.error('无权修改此话题')
-    
-    data = request.get_json()
-    
-    # 更新字段
-    if 'title' in data:
-        topic.title = data['title']
-    if 'summary' in data:
-        topic.summary = data['summary']
-    
-    topic.update_time = datetime.now()
-    db.session.commit()
-    
-    return Result.success("更新成功")
+    """
+    更新帖子
+    """
+    try:
+        from app.models.feedModels import Post
+        from app.extensions import db
+        from datetime import datetime
+        
+        post = Post.query.get(post_id)
+        
+        if not post:
+            return Result.error('帖子不存在')
+        
+        # 检查权限
+        user_id = get_current_user_id()
+        if not user_id or post.user_id != user_id:
+            return Result.error('无权修改此帖子')
+        
+        data = request.get_json()
+        
+        # 验证必要字段
+        if not data:
+            return Result.error('请求数据为空')
+        
+        # 更新字段
+        update_fields = []
+        
+        if 'title' in data:
+            post.title = data['title'].strip()
+            update_fields.append('标题')
+        
+        if 'content' in data:
+            post.content = data['content'].strip()
+            update_fields.append('内容')
+        
+        if 'summary' in data:
+            post.summary = data['summary'].strip()
+            update_fields.append('摘要')
+        
+        if 'tags' in data:
+            post.tags = data['tags'].strip()
+            update_fields.append('标签')
+        
+        # 如果有更新，更新修改时间
+        if update_fields:
+            post.update_time = datetime.now()
+            db.session.commit()
+            print(f"DEBUG: 帖子 {post_id} 已更新字段: {', '.join(update_fields)}")
+            return Result.success("更新成功")
+        else:
+            return Result.error('没有需要更新的字段')
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"更新失败: {str(e)}")
 
 @feed_bp.route('/post/<int:post_id>', methods=['DELETE'])
 def delete_post(post_id):
-    from app.models.feedModels import Post
-    from app.extensions import db
-    
-    post = Post.query.get(post_id)
-    
-    if not post:
-        return Result.error('帖子不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or post.user_id != user_id:
-        return Result.error('无权删除此帖子')
-    
-    # 软删除
-    post.status = 0
-    db.session.commit()
-    
-    return Result.success("删除成功")
+    """
+    删除帖子（级联删除相关数据）
+    """
+    try:
+        user_id = get_current_user_id()
+        
+        if not user_id:
+            return Result.error('请先登录')
+        
+        # 调用服务进行级联删除
+        from app.services.feedService import FeedService
+        result = FeedService.delete_post_with_cascade(post_id, user_id)
+        
+        if result["success"]:
+            return Result.success(result["message"])
+        else:
+            return Result.error(result["message"])
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"删除失败: {str(e)}")
+
+@feed_bp.route('/topic/<int:topic_id>', methods=['PUT'])
+def update_topic(topic_id):
+    """
+    更新话题
+    """
+    try:
+        from app.models.feedModels import Topic
+        from app.extensions import db
+        from datetime import datetime
+        
+        topic = Topic.query.get(topic_id)
+        
+        if not topic:
+            return Result.error('话题不存在')
+        
+        # 检查权限
+        user_id = get_current_user_id()
+        if not user_id or topic.user_id != user_id:
+            return Result.error('无权修改此话题')
+        
+        data = request.get_json()
+        
+        # 验证必要字段
+        if not data:
+            return Result.error('请求数据为空')
+        
+        # 更新字段
+        update_fields = []
+        
+        if 'title' in data:
+            topic.title = data['title'].strip()
+            update_fields.append('标题')
+        
+        if 'summary' in data:
+            topic.summary = data['summary'].strip()
+            update_fields.append('描述')
+        
+        # 如果有更新，更新修改时间
+        if update_fields:
+            topic.update_time = datetime.now()
+            db.session.commit()
+            print(f"DEBUG: 话题 {topic_id} 已更新字段: {', '.join(update_fields)}")
+            return Result.success("更新成功")
+        else:
+            return Result.error('没有需要更新的字段')
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"更新失败: {str(e)}")
 
 @feed_bp.route('/topic/<int:topic_id>', methods=['DELETE'])
 def delete_topic(topic_id):
-    from app.models.feedModels import Topic
-    from app.extensions import db
-    
-    topic = Topic.query.get(topic_id)
-    
-    if not topic:
-        return Result.error('话题不存在')
-    
-    # 检查权限
-    user_id = get_current_user_id()
-    if not user_id or topic.user_id != user_id:
-        return Result.error('无权删除此话题')
-    
-    # 软删除
-    topic.status = 0
-    db.session.commit()
-    
-    return Result.success("删除成功")
+    """
+    删除话题（级联删除相关数据）
+    """
+    try:
+        user_id = get_current_user_id()
+        
+        if not user_id:
+            return Result.error('请先登录')
+        
+        # 调用服务进行级联删除
+        from app.services.feedService import FeedService
+        result = FeedService.delete_topic_with_cascade(topic_id, user_id)
+        
+        if result["success"]:
+            return Result.success(result["message"])
+        else:
+            return Result.error(result["message"])
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return Result.error(f"删除失败: {str(e)}")
+
+# 添加在feedController.py中的合适位置
+@feed_bp.route('/topic/<int:topic_id>/posts', methods=['GET'])
+def get_topic_posts(topic_id):
+    """
+    获取话题下的帖子列表
+    """
+    try:
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        size = int(request.args.get('size', 10))
+        sort = request.args.get('sort', 'time')
+        
+        # 调用服务获取数据
+        result = FeedDetailService.get_topic_posts(topic_id, page, size, sort)
+        
+        if result["success"]:
+            return Result.success(result["data"])
+        else:
+            return Result.error(result["message"])
+            
+    except Exception as e:
+        return Result.error(f"获取话题帖子失败: {str(e)}")
+
+@feed_bp.route('/post/<int:post_id>/comments', methods=['GET'])
+def get_post_comments(post_id):
+    """
+    获取帖子的评论列表（分页版本）
+    """
+    try:
+        
+        
+        # 获取分页参数
+        page = int(request.args.get('page', 1))
+        size = int(request.args.get('size', 20))
+        
+        # 获取评论列表
+        result = FeedDetailService.get_post_comments(post_id, page, size)
+        
+        if result["success"]:
+            return Result.success(result["data"])
+        else:
+            return Result.error(result["message"])
+            
+    except Exception as e:
+        return Result.error(f"获取评论失败: {str(e)}")
+
+@feed_bp.route('/interaction/status', methods=['GET'])
+def get_interaction_status():
+    """
+    获取用户的互动状态
+    """
+    try:
+        
+        
+        # 获取参数
+        entity_type = int(request.args.get('entity_type', 0))
+        entity_id = int(request.args.get('entity_id', 0))
+        
+        if not entity_type or not entity_id:
+            return Result.error('参数不完整')
+        
+        # 获取当前用户ID
+        user_id = get_current_user_id()
+        
+        # 获取互动状态
+        result = FeedDetailService.get_user_interaction_status(user_id, entity_type, entity_id)
+        
+        if result["success"]:
+            return Result.success(result["data"])
+        else:
+            return Result.error(result["message"])
+            
+    except Exception as e:
+        return Result.error(f"获取互动状态失败: {str(e)}")
+
+@feed_bp.route('/post/<int:post_id>/related', methods=['GET'])
+def get_related_posts(post_id):
+    """
+    获取相关帖子
+    """
+    try:
+        
+        
+        # 获取数量参数
+        limit = int(request.args.get('limit', 5))
+        
+        # 获取相关帖子
+        result = FeedDetailService.get_related_posts(post_id, limit)
+        
+        if result["success"]:
+            return Result.success(result["data"])
+        else:
+            return Result.error(result["message"])
+            
+    except Exception as e:
+        return Result.error(f"获取相关帖子失败: {str(e)}")
+
+@feed_bp.route('/interaction/state', methods=['GET'])
+def get_interaction_state():
+    """
+    获取用户对某个实体的互动状态（简化版）
+    """
+    try:
+        # 获取参数
+        entity_type = int(request.args.get('entity_type', 0))
+        entity_id = int(request.args.get('entity_id', 0))
+        
+        if not entity_type or not entity_id:
+            return Result.error('参数不完整')
+        
+        # 获取当前用户ID
+        user_id = get_current_user_id()
+        
+        # 查询互动状态
+        from app.models.feedModels import FeedLike, FeedCollect, FeedFollow
+        
+        result = {
+            "is_liked": False,
+            "is_collected": False,
+            "is_followed": False
+        }
+        
+        if not user_id:
+            return Result.success(result)
+        
+        # 点赞状态
+        like_record = FeedLike.query.filter_by(
+            user_id=user_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            status=1
+        ).first()
+        result["is_liked"] = like_record is not None
+        
+        if entity_type == 1:  # 帖子
+            # 收藏状态
+            collect_record = FeedCollect.query.filter_by(
+                user_id=user_id,
+                entity_id=entity_id,
+                status=1
+            ).first()
+            result["is_collected"] = collect_record is not None
+        elif entity_type == 2:  # 话题
+            # 关注状态
+            follow_record = FeedFollow.query.filter_by(
+                user_id=user_id,
+                entity_id=entity_id,
+                status=1
+            ).first()
+            result["is_followed"] = follow_record is not None
+        
+        return Result.success(result)
+        
+    except Exception as e:
+        return Result.error(f"获取互动状态失败: {str(e)}")
