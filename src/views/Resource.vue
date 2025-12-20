@@ -101,7 +101,13 @@ const total = ref(0)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 
 const drawer = ref({ open: false, item: null })
-const ai = ref({ open: false, loading: false, text: '' })
+const ai = ref({
+  open: false,
+  loading: false,
+  text: '',
+  item: null
+})
+
 
 onMounted(async () => {
   await loadTags()
@@ -216,11 +222,42 @@ async function download(item) {
 }
 
 /** —— AI 摘要 / 计划 —— */
+// async function aiSummary(item) {
+//   if (item.type === 'zip' || item.type === 'link') return
+//   ai.value = { open: true, loading: true, text: '' }
+//   try {
+//     const { data } = await aiSummaryApi({ id: item.id })
+//     ai.value.text = data?.html || '<p>暂无摘要</p>'
+//   } catch (e) {
+//     console.error(e); ai.value.text = '<p>生成失败，请稍后重试</p>'
+//   } finally {
+//     ai.value.loading = false
+//   }
+// }
+
 async function aiSummary(item) {
   if (item.type === 'zip' || item.type === 'link') return
-  ai.value = { open: true, loading: true, text: '' }
+  ai.value = {
+    open: true,
+    loading: true,
+    text: '',
+    item
+  }
   try {
-    const { data } = await aiSummaryApi({ id: item.id })
+    // 注释掉真实的接口调用
+    // const { data } = await aiSummaryApi({ id: item.id })
+
+    // 直接赋值假数据，结构与真实接口保持一致
+    const data = {
+      html: `
+        <div>
+          <h3>内容摘要</h3>
+          <p>本次内容主要讲解了Vue3中响应式数据的实现原理，</p>
+          <p>包括ref、reactive的使用场景和底层逻辑。</p>
+        </div>
+      `
+    };
+
     ai.value.text = data?.html || '<p>暂无摘要</p>'
   } catch (e) {
     console.error(e); ai.value.text = '<p>生成失败，请稍后重试</p>'
@@ -228,19 +265,44 @@ async function aiSummary(item) {
     ai.value.loading = false
   }
 }
+
+// async function aiPlan() {
+//   const item = drawer.value.item
+//   if (!item) return
+//   ai.value = { open: true, loading: true, text: '' }
+//   try {
+//     const { data } = await aiPlanApi({ id: item.id })
+//     ai.value.text = data?.html || '<p>暂无学习计划</p>'
+//   } catch (e) {
+//     console.error(e); ai.value.text = '<p>生成失败，请稍后重试</p>'
+//   } finally {
+//     ai.value.loading = false
+//   }
+// }
+
 async function aiPlan() {
-  const item = drawer.value.item
-  if (!item) return
-  ai.value = { open: true, loading: true, text: '' }
+  const item = ai.value.item
+  if (!item) return alert('未找到对应资源')
+
+  ai.value.loading = true
   try {
-    const { data } = await aiPlanApi({ id: item.id })
-    ai.value.text = data?.html || '<p>暂无学习计划</p>'
-  } catch (e) {
-    console.error(e); ai.value.text = '<p>生成失败，请稍后重试</p>'
+    const data = {
+      html: `
+        <div>
+          <h3>学习计划（基于《${item.title}》）</h3>
+          <p>1. 通读文档并整理核心概念</p>
+          <p>2. 编写示例代码进行验证</p>
+          <p>3. 总结常见问题与最佳实践</p>
+        </div>
+      `
+    }
+    ai.value.text = data.html
   } finally {
     ai.value.loading = false
   }
 }
+
+
 
 /** —— 列表：统一走接口 —— */
 async function fetchList() {
@@ -472,7 +534,7 @@ function format(n) {
           <div v-else class="ai-text" v-html="ai.text"></div>
         </div>
         <footer class="modal-ft">
-          <button class="ghost" @click="aiPlan">生成学习计划</button>
+          <button class="ghost" @click="aiPlan()">生成学习计划</button>
           <button class="primary" @click="ai.open = false">完成</button>
         </footer>
       </div>

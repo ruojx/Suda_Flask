@@ -18,7 +18,7 @@ def create_app():
     from app.api.auth import auth_bp
     from app.api.feedController import feed_bp
     from app.api.resource import resource_bp
-    from app.api.chat import chat_bp
+    # from app.api.chat import chat_bp
     from app.api.feedInteractionController import interaction_bp
     from app.api.feedSearchController import feed_search_bp
     from app.api.user import user_bp
@@ -26,7 +26,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(feed_bp)
     app.register_blueprint(resource_bp)
-    app.register_blueprint(chat_bp)
+    # app.register_blueprint(chat_bp)
     app.register_blueprint(interaction_bp)
     app.register_blueprint(feed_search_bp)
     app.register_blueprint(user_bp)

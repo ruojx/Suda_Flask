@@ -10,7 +10,7 @@ const route = useRoute()
 const navs = [
   { label: '首页', path: '/home' },
   { label: '资源', path: '/resource' },
-  { label: '讨论', path: '/chat' },
+  // { label: '讨论', path: '/chat' },
   // { label: '咨询', path: '/Consultation' }
 ]
 
@@ -196,6 +196,7 @@ const loginLink = computed(() => ({
   display: flex;
   align-items: center;
   gap: 18px;
+  margin-left: 30px;
 }
 
 .logo {
